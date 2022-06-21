@@ -1,0 +1,1 @@
+As part of my MSc project, I'm developing a visualisation tool that takes in the POETS instrumentation data and outputs a graphical representation of the hardware utilisation. To do so, I'll develop the backend in Python using the Bokeh library, and I'll also write HTML code to design a web page where the graphs can be displayed.
