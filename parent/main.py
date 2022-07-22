@@ -1,3 +1,11 @@
+''' A dashboard that utilizes `Auto MPG`_ and stocks dataset.
+This example demonstrates the use of Bootstrap templates to compile several types
+of charts in one file.
+.. note::
+    This example needs the Pandas package to run.
+.. _Auto MPG: https://archive.ics.uci.edu/ml/datasets/auto+mpg
+'''
+
 import threading
 import sys
 import math
@@ -6,16 +14,12 @@ import signal
 import numpy as np
 import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
-                          LinearColorMapper, PrintfTickFormatter, RangeTool, Range1d)
+                          LinearColorMapper, PrintfTickFormatter, RangeTool)
 from bokeh.plotting import figure, curdoc
 from bokeh.models import Button
 from bokeh.layouts import column
 from bokeh.transform import linear_cmap
 from bokeh.palettes import Turbo256 as palette2
-
-
-
-
 
 # Socket Configurations
 ############################################################################
@@ -23,17 +27,18 @@ API_DELIMINATOR = "-"
 SERVER = socket.gethostbyname(socket.gethostname()) # Automatically retrieve IP address
 PORT = 5064 # Random port
 ADDR = (SERVER, PORT)
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # change to ipv6
 sock.bind(ADDR)
 #sock.setblocking(0)
 disconnect_msg = "DISCONNECT"
+refresh_rate = 500 ## Time in millisecond for updating live plots
 # no options for now sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
 
 
 
 # POETS Configurations
 ############################################################################
-ThreadCount = 256   # The actual number of threads present in a POETS box is 6144
+ThreadCount = 505   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
@@ -84,14 +89,14 @@ rangex = list((str(x) for x in range(CoreCount)))
 
 #Configurations for Heatmap - Used for TX/S values
 
-heatmap = figure(width=800, height=300, toolbar_location = None, name = "heatmap",
+heatmap = figure(height=300, toolbar_location = None,
            x_range=rangex, y_range=rangex, tools="")
 
 #Extra tools available on the webpage
 TOOLS="hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
 TOOLTIPS = [("core", "$index"),
             ("TX/s", "@intensity")]
-heatmap = figure(tools=TOOLS, tooltips = TOOLTIPS, title="Heat Map")
+heatmap = figure(height = 590, width = 560, tools=TOOLS, tooltips = TOOLTIPS, title="Heat Map",  name = "heatmap", toolbar_location="below")
 
 #The axis tick interval depends on the size of the graphs
 if(root_core <= 20):
@@ -115,35 +120,37 @@ heatmap.add_layout(color_bar, 'right')
 
 #Configurations for Line plot - Used for Cache Miss - Hit - WB values
 
-line = figure(title = "Cache Data", tools = TOOLS, height=300, width=800, toolbar_location=None,
+line = figure(width = 720, title = "Line Graph", tools = TOOLS, height=300, toolbar_location=None,
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
     background_fill_color="#efefef", x_range=(0, 99))
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
 #Separated figure for the range selector, which allows to zoom in a specific section of time
-select = figure(title="Drag the middle and edges of the selection box to change the range above",
-            height=130, width=800, y_range=line.y_range,
+select = figure(width = 720, title="Drag the middle and edges of the selection box to change the range above",
+            height=130, y_range=line.y_range,
             x_axis_type="datetime", y_axis_type=None,
         tools="", toolbar_location=None, background_fill_color="#efefef")
 select.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
 layout = column(line, select, sizing_mode="scale_width", name="line")
 
-
 #Configurations for Bar Chart - Used for CPUIDLE count
 
-bar = figure(title="Bar Chart", name = "bar",
+bar = figure(width = 480, title="Bar Chart", name = "bar",
         toolbar_location=None, tools="")
 
 bar.xgrid.grid_line_color = None
 bar.axis.minor_tick_line_color = None
 bar.outline_line_color = None
 bar.yaxis.formatter = PrintfTickFormatter(format="%d%%")
+bar.xaxis.formatter = PrintfTickFormatter(format="%ss")
+
 
 #Configurations for Live Line Chart - Used for TX
 
+
 TOOLTIPS2 = [("Thread", "$index")]
-liveLine = figure(tools=TOOLS, tooltips = TOOLTIPS2, title = "Live Thread Instrumentation", name = "liveLine")
+liveLine = figure(height = 590, width = 720, tools=TOOLS, tooltips = TOOLTIPS2, title = "Live Thread Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
 liveLine.x_range.follow="end"
 liveLine.x_range.follow_interval = 30
 liveLine.x_range.range_padding=0
@@ -173,6 +180,7 @@ bar.yaxis.formatter = PrintfTickFormatter(format="%d%%")
 kill = 0    # Variable used to kill threads
 second_graph = 0 # Variable used to start other graphs
 block = 0 # Variable used to freeze the Heatmap
+
 def signal_handler(*args, **kwargs):
     print("\nTerminating Visualiser...")
     global kill
@@ -194,7 +202,7 @@ def dataUpdater():
     while True:
         if not(kill):
             try:
-                data, address = sock.recvfrom(65535)
+                data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour
                 msg = data.decode("utf-8")
                 if(msg == disconnect_msg):
                     second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
@@ -257,15 +265,6 @@ def plotterUpdater():
             finalBlocked[i] = finalBlocked[i]/CoreCount
             finalIdle[i] = finalIdle[i]/CoreCount
         
-        #if stamement to check length of maximum and mim rows of threads to determine wether following division is needed
-        # These values could be further group together between time istances
-        #if(numberPoints > 100):
-         #   w = math.ceil(numberPoints/100)
-          #  nBlocked = [sum(finalBlocked[j:j+w])//n for j in range(0,len(finalBlocked),w)]
-           # nIdle = [sum(finalIdle[j:j+w])//w for j in range(0,len(finalIdle),w)]
-        #else:
-         #   nblocked = finalBlocked
-          #  nIdle = finalIdle
 
         # Creating ColumnDataSources for each graph, this is Bokeh's way of specifying data
 
@@ -301,7 +300,7 @@ def plotterUpdater():
         
         sourceBar = ColumnDataSource(data=dataBar)
 
-        bar.vbar(x="x_values", top = "CPUIDLE", width=0.9, color="#718dbf", source = sourceBar, legend="CPUIDLE time")
+        bar.vbar(x="x_values", top = "CPUIDLE", width=0.2, color="#718dbf", source = sourceBar)
         stopper()
 
     if not (block):
@@ -349,9 +348,23 @@ dataThread = threading.Thread(name='data',target=dataUpdater)
 dataThread.daemon = True
 dataThread.start()
 
-# Button to freeze execution of heatmap
-button = Button(label="Stop")
+# Setup
+curdoc().add_root(liveLine)
+curdoc().add_root(heatmap)
+curdoc().add_root(bar)
+curdoc().add_root(layout)
+button = Button(label="Stop/Resume", name = "button")
 button.on_click(stopper)
+curdoc().add_root(button)
 
-curdoc().add_root(column(button, heatmap, liveLine, layout, bar))
-curdoc().add_periodic_callback(plotterUpdater, 500) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Ver
+
+
+
+curdoc().title = "POETS Dashboard"
+curdoc().template_variables['stats_names'] = [ 'Threads', 'Cores', 'Refresh']
+curdoc().template_variables['stats'] = {
+    'Threads'     : {'icon': None,          'value': 49152,  'label': 'Total Threads'},
+    'Cores'       : {'icon': None,        'value': 3072,  'label': 'Total Cores'},
+    'Refresh'        : {'icon': None,        'value': refresh_rate,  'label': 'Refresh Rate'},
+}
+curdoc().add_periodic_callback(plotterUpdater, refresh_rate) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Ver

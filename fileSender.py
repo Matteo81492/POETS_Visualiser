@@ -1,4 +1,5 @@
 from multiprocessing import Process
+import multiprocessing
 import sys
 import time
 import signal
@@ -9,7 +10,7 @@ import numpy
 SERVER = socket.gethostbyname(socket.gethostname()) # The Server address is automatically found by checking the current computer's IP address
 PORT = 5064 # Random port
 ADDR = (SERVER, PORT)
-API_DELIMINATOR = "¿"
+API_DELIMINATOR = "-"
 disconnect_msg = "DISCONNECT"
 
 graphData = 0
@@ -23,12 +24,12 @@ def fileReader(thread_number):
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
-                            skiprows=1, max_rows=50, usecols=(12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
+                            skiprows=2, max_rows=10, usecols=(1, 12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
     except Exception as e:
         print("Couldn't read thread " + str(thread_number) + " data because " + str(e))
     
     for s in (data):
-        message_str = str(thread_number) + API_DELIMINATOR + str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5])
+        message_str = str(thread_number) + API_DELIMINATOR + str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5]) + API_DELIMINATOR + str(s[6])
         Sock.sendto(message_str.encode('utf-8'), ADDR)
         print(message_str)
         time.sleep(1)
@@ -47,15 +48,16 @@ def main():
     files = glob.glob(fpattern)
     processCount = len(files)
     print("number of threads is " + str(processCount))
-    processes = []
-    for i in range(processCount):
-        processes.append(Process(target=fileReader, args=(i,)))
-        processes[i].start()
-        
+
+    num_workers = multiprocessing.cpu_count()  
+
+    pool = multiprocessing.Pool(num_workers)    ##Rather than opening an excessive number of process which may cause problems, I'm limiting the number based on the resources
+    for i in range(processCount):           ## available.
+        pool.apply_async(fileReader, args = (i,))
+
+    pool.close()
     signal.signal(signal.SIGINT, signal_handler)
-    
-    for i in range(processCount):
-        processes[i].join()
+    pool.join()
     Sock.sendto(disconnect_msg.encode('utf-8'), ADDR)
     
 
