@@ -27,7 +27,6 @@
           <div class="count">{{ stats[name].value }}</div>
         </div>
         {% endfor %}
-        {{ embed(roots.button) }}
       </div>
       <!-- /top tiles -->
 
@@ -35,9 +34,10 @@
         <div class="col-md-5 col-sm-5 col-xs-5">
           <div class="x_panel tile fixed_height_320 overflow_hidden">
             <div class="x_title">
-              <h3>Core Activation</small></h3>
+              <h3>Selected Activation</small></h3>
               <div class="clearfix"></div>
             </div>
+            {{ embed(roots.menu) }}
             {{ embed(roots.heatmap) }}
           </div>
         </div>
@@ -48,6 +48,7 @@
                   <h3>Thread Activation</small></h3>
                 </div>
               </div>
+              {{ embed(roots.button) }}
               {{ embed(roots.liveLine) }}
             </div>
           </div>
@@ -62,6 +63,9 @@
               <div class="clearfix"></div>
             </div>
             {{ embed(roots.bar) }}
+            <h2></h2>
+            <h5>For more information on the POETS Project</small></h5>
+            <a href="https://poets-project.org/">click here</a>
           </div>
         </div>
 
@@ -73,15 +77,14 @@
               <div class="clearfix"></div>
             </div>
             {{ embed(roots.line) }}
+            <h1></small></h1>
+            <h3 style="text-align: center;">History Table</h3>
+            {{ embed(roots.table) }}
           </div>
         </div>
-
       </div>
-
     </div>
-
   </div>
-  <a href="https://poets-project.org/">for more information on the POETS project click here</a>
 </div>
 <!-- /page content -->
 

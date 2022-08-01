@@ -1,3 +1,4 @@
+import mailbox
 import threading
 import sys
 import math
@@ -8,32 +9,33 @@ import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
                           LinearColorMapper, PrintfTickFormatter, RangeTool, Range1d)
 from bokeh.plotting import figure, curdoc
-from bokeh.models import Button
+from bokeh.models import Button, Dropdown
 from bokeh.layouts import column
 from bokeh.transform import linear_cmap
 from bokeh.palettes import Turbo256 as palette2
 
 
 
-
-
 # Socket Configurations
 ############################################################################
 API_DELIMINATOR = "-" 
-SERVER = socket.gethostbyname(socket.gethostname()) # Automatically retrieve IP address
 PORT = 5064 # Random port
-ADDR = (SERVER, PORT)
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+host = socket.gethostname()
+SERVER = socket.getaddrinfo(host, PORT, socket.AF_INET6)
+ADDR = (SERVER[0][4][0], PORT)
+sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_IP)
+sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
+
+#print(socket.getaddrinfo())
 #sock.setblocking(0)
 disconnect_msg = "DISCONNECT"
-# no options for now sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
 
 
 
 # POETS Configurations
 ############################################################################
-ThreadCount = 256   # The actual number of threads present in a POETS box is 6144
+ThreadCount = 64   # The actual number of threads present in a POETS box is 6144
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
@@ -151,7 +153,6 @@ liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
 
-
 step = 1 # Step for X range
 zero_list = [0] * 10
 step_list = [i * step for i in range(10)]
@@ -173,6 +174,9 @@ bar.yaxis.formatter = PrintfTickFormatter(format="%d%%")
 kill = 0    # Variable used to kill threads
 second_graph = 0 # Variable used to start other graphs
 block = 0 # Variable used to freeze the Heatmap
+gap1 = 16
+gap2 = 1
+
 def signal_handler(*args, **kwargs):
     print("\nTerminating Visualiser...")
     global kill
@@ -183,8 +187,24 @@ def signal_handler(*args, **kwargs):
 
 def stopper():
     global block, second_graph
-    block = ~block
+    block = 1
     second_graph = 0
+
+def clicker(event):
+    global gap1, gap2
+    print(event.item)
+    if event.item == "MAILBOX":
+        gap1 = 16 * 4
+        gap2 = 4
+        heatmap.renderers = []
+
+
+    else:
+        gap1 = 16
+        gap2 = 1
+
+
+
 
 
 def dataUpdater():
@@ -223,8 +243,6 @@ def dataUpdater():
 def plotterUpdater():
     print(" IN PLOTTER UPDATER ")
     print(f"active  {threading.active_count()}")
-    length = CoreCount * n
-    CoreLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, length ,n)]
 
     if(second_graph):
         global kill
@@ -305,11 +323,18 @@ def plotterUpdater():
         stopper()
 
     if not (block):
-        print(CoreLevel)
 
-        data = {'x_values' : core_count_x,
-            'y_values' : core_count_y,
-            'intensity': CoreLevel}      # was ThreadLevel
+        length = CoreCount * n
+        SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
+        selected_count_x = core_count_x[0:int(len(core_count_x)/gap2)]
+        selected_count_y = core_count_y[0:int(len(core_count_y)/gap2)]
+
+        print(SelectedLevel)
+        print(str(len(core_count_y)/gap2))
+
+        data = {'x_values' : selected_count_x,
+            'y_values' : selected_count_y,
+            'intensity': SelectedLevel}      # was ThreadLevel
 
         #create a ColumnDataSource by passing the dict
         source = ColumnDataSource(data=data)
@@ -353,5 +378,8 @@ dataThread.start()
 button = Button(label="Stop")
 button.on_click(stopper)
 
-curdoc().add_root(column(button, heatmap, liveLine, layout, bar))
+menu = Dropdown(label = "Select Hierarchy", menu = ["CORE", "MAILBOX", "BOARD", "BOX"])
+menu.on_click(clicker)
+
+curdoc().add_root(column(button, menu, heatmap, liveLine, layout, bar))
 curdoc().add_periodic_callback(plotterUpdater, 500) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Ver

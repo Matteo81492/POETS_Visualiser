@@ -7,17 +7,18 @@ import socket
 import glob
 import numpy 
 
-SERVER = socket.gethostbyname(socket.gethostname()) # The Server address is automatically found by checking the current computer's IP address
 PORT = 5064 # Random port
-ADDR = (SERVER, PORT)
+SERVER = socket.getaddrinfo(socket.gethostname(), PORT) # The Server address is automatically found by checking the current computer's IP address
+ADDR = (SERVER[0][4][0], PORT)
 API_DELIMINATOR = "-"
 disconnect_msg = "DISCONNECT"
 
 graphData = 0
 message_str = ""
 
-Sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    
+Sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+Sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
+
 def fileReader(thread_number):    
     signal.signal(signal.SIGINT, signal_handler)
     fName = './visualiser_demo_3/instrumentation_thread_' + str(thread_number) + '.csv'
@@ -44,21 +45,24 @@ def main():
         print("ERROR: Sender must be executed using Python 3")
         sys.exit(-1)
 
+    processes = []
+    
     fpattern = './visualiser_demo_3/instrumentation_thread_*.csv'
     files = glob.glob(fpattern)
     processCount = len(files)
     print("number of threads is " + str(processCount))
-
-    num_workers = multiprocessing.cpu_count()  
-
-    pool = multiprocessing.Pool(num_workers)    ##Rather than opening an excessive number of process which may cause problems, I'm limiting the number based on the resources
-    for i in range(processCount):           ## available.
-        pool.apply_async(fileReader, args = (i,))
-
-    pool.close()
+    for i in range(processCount):
+        processes.append(Process(target=fileReader, args=(i,)))
+        processes[i].start()
+        
     signal.signal(signal.SIGINT, signal_handler)
-    pool.join()
+    
+    for i in range(processCount):
+        processes[i].join()
     Sock.sendto(disconnect_msg.encode('utf-8'), ADDR)
+
+
+
     
 
 if __name__ == '__main__':
