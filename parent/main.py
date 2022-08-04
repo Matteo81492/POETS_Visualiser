@@ -27,7 +27,7 @@ API_DELIMINATOR = "-"
 PORT = 5064 # Random port
 host = socket.gethostname()
 SERVER = socket.getaddrinfo(host, PORT, socket.AF_INET6)    ## Automatically get local IPV6 Address 
-ADDR = (SERVER[0][4][0], PORT)
+ADDR = ("::1", PORT)
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_IP) ## Create UDP socket
 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)

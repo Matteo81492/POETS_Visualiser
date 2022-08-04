@@ -9,7 +9,7 @@ import numpy
 
 PORT = 5064 # Random port
 SERVER = socket.getaddrinfo(socket.gethostname(), PORT) # The Server address is automatically found by checking the current computer's IP address
-ADDR = (SERVER[0][4][0], PORT)
+ADDR = ("::1", PORT)
 API_DELIMINATOR = "-"
 disconnect_msg = "DISCONNECT"
 
@@ -21,7 +21,7 @@ Sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 
 def fileReader(thread_number):    
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './visualiser_demo_3/instrumentation_thread_' + str(thread_number) + '.csv'
+    fName = './visualiser_data/instrumentation_thread_' + str(thread_number) + '.csv'
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
@@ -47,7 +47,7 @@ def main():
 
     processes = []
     
-    fpattern = './visualiser_demo_3/instrumentation_thread_*.csv'
+    fpattern = './visualiser_data/instrumentation_thread_*.csv'
     files = glob.glob(fpattern)
     processCount = len(files)
     print("number of threads is " + str(processCount))
