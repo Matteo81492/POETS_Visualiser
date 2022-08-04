@@ -38,7 +38,7 @@ disconnect_msg = "DISCONNECT"
 # POETS Configurations
 ############################################################################
 refresh_rate = 250 ## Time in millisecond for updating live plots
-ThreadCount = 256   # The actual number of threads present in a POETS box is 6144 - 49152 in total
+ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
@@ -89,7 +89,7 @@ for i in range(root_mailbox):
 row_x = [x + 0.5 for x in range(root_board)]
 board_count_x = []
 board_count_y = []
-for i in range(root_board):
+for i in range(root_board+2):     ## + 2 because two extra rows are needed to reach 48 board count
     board_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_board)]
     board_count_y.extend(column_y)
@@ -97,7 +97,7 @@ for i in range(root_board):
 row_x = [x + 0.5 for x in range(root_box)]
 box_count_x = []
 box_count_y = []
-for i in range(root_box):
+for i in range(root_box+2):     ## + 2 because two extra rows are needed to reach 8 box count
     box_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_box)]
     box_count_y.extend(column_y)
@@ -144,9 +144,7 @@ color_bar = ColorBar(color_mapper=bar_map,
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
 
 heatmap.add_layout(color_bar, 'right')
-mapper = linear_cmap(field_name="intensity", palette=colors, low=5000, high=25000)
-heatmapO = heatmap.rect(x=[],  y=[], width = 1 , height = 1, line_color=None, fill_color=mapper)
-heatmap_ds = heatmapO.data_source
+
 
 
 
@@ -331,7 +329,6 @@ def plotterUpdater():
 
     print(" IN PLOTTER UPDATER ")
     print(f"active  {threading.active_count()}")
-    length = CoreCount * n
 
     if(second_graph):
         print(" RENDERING OTHER GRAPHS ")
@@ -418,34 +415,37 @@ def plotterUpdater():
 
 
     if not (block):
-
-        length = CoreCount * n
         if(gap1 == 16):                     ## CORE VIEW
+            length = len(core_count_x) * gap1
             selected_count_x = core_count_x
             selected_count_y = core_count_y
             SelectedLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, length ,n)]
 
 
         elif(gap1 == 64):                   ## MAILBOX VIEW
+            length = len(mailbox_count_x) * gap1
             selected_count_x = mailbox_count_x
             selected_count_y = mailbox_count_y
             SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
 
         elif(gap1 == 1024):                 ## BOARD VIEW
+            length = len(board_count_x) * gap1
             selected_count_x = board_count_x
             selected_count_y = board_count_y
             SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
 
         else:                               ## BOX VIEW
+            length = len(box_count_x) * gap1
             selected_count_x = box_count_x
             selected_count_y = box_count_y
             SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
 
-
-        new_data_heatmap = {'x' : selected_count_x,
+        heatmap_data = {'x' : selected_count_x,
             'y' : selected_count_y,
             'intensity': SelectedLevel}      # was ThreadLevel
         #create a ColumnDataSource by passing the dict
+
+        heat_source = ColumnDataSource(data=heatmap_data)
             
         latest = ContainerX[0][-1] + step
         for i in range(len(ContainerY)):
@@ -460,7 +460,9 @@ def plotterUpdater():
             'line_color' : colours}
 
         liveLine_ds.data = new_data_liveLine
-        heatmap_ds.data = new_data_heatmap
+        mapper = linear_cmap(field_name="intensity", palette=colors, low=5000, high=25000)
+        heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
+
     else:
         print(" blocking callback function ")
 

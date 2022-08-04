@@ -21,7 +21,7 @@ Sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 
 def fileReader(thread_number):    
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './visualiser_demo_3/instrumentation_thread_' + str(thread_number) + '.csv'
+    fName = './visualiser_data/instrumentation_thread_' + str(thread_number) + '.csv'
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
@@ -47,9 +47,9 @@ def main():
 
     processes = []
     
-    fpattern = './visualiser_demo_3/instrumentation_thread_*.csv'
+    fpattern = './visualiser_data/instrumentation_thread_*.csv'
     files = glob.glob(fpattern)
-    processCount = len(files)
+    processCount = 64
     print("number of threads is " + str(processCount))
     for i in range(processCount):
         processes.append(Process(target=fileReader, args=(i,)))
