@@ -37,9 +37,9 @@ disconnect_msg = "DISCONNECT"
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 250 ## Time in millisecond for updating live plots
+refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
-ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
+ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
@@ -57,7 +57,7 @@ usage = 0
 # all per-core graphs
 ############################################################################
 cacheDataMiss=np.empty((CoreCount,), dtype = object)
-cacheDataHit=np.empty((CoreCount,), dtype = object)
+cacheDataHit=np.empty((CoreCount,), dtype =  object)
 cacheDataWB=np.empty((CoreCount,), dtype = object)
 CPUIdle=np.empty((CoreCount,), dtype = object)
 
@@ -77,6 +77,7 @@ for i in range(root_core):
     core_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_core)]
     core_count_y.extend(column_y)
+len_core = len(core_count_x) * 16
 
 row_x = [x + 0.5 for x in range(root_mailbox)]
 mailbox_count_x = []
@@ -85,6 +86,7 @@ for i in range(root_mailbox):
     mailbox_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_mailbox)]
     mailbox_count_y.extend(column_y)
+len_mailbox = len(mailbox_count_x) * 64
 
 row_x = [x + 0.5 for x in range(root_board)]
 board_count_x = []
@@ -93,6 +95,7 @@ for i in range(root_board+2):     ## + 2 because two extra rows are needed to re
     board_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_board)]
     board_count_y.extend(column_y)
+len_board = len(board_count_x) * 1024
 
 row_x = [x + 0.5 for x in range(root_box)]
 box_count_x = []
@@ -101,6 +104,7 @@ for i in range(root_box+2):     ## + 2 because two extra rows are needed to reac
     box_count_x.extend(row_x)
     column_y = [i+0.5 for x in range(root_box)]
     box_count_y.extend(column_y)
+len_box = len(box_count_x) * 6144
 
 
 #The ranges must be strings
@@ -150,7 +154,7 @@ heatmap.add_layout(color_bar, 'right')
 
 #Configurations for Line plot - Used for Cache Miss - Hit - WB values
 TOOLTIPS = [("second", "$index"),
-            ("value", "@y_values")]
+            ("value", "$y")]
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
     background_fill_color="#efefef", x_range=(0, 99))
@@ -181,7 +185,7 @@ layout = column(line, select, sizing_mode="scale_width", name="line")
 #Configurations for Bar Chart - Used for CPUIDLE count
 
 TOOLTIPS = [("second", "$index"),
-            ("percentage", "@CPUIDLE")]
+            ("percentage", "$y")]
 
 bar = figure(height = 580, width = 490, title="Bar Chart", name = "bar",
         toolbar_location="below", tools=TOOLS, tooltips = TOOLTIPS, y_range = (0, 100))
@@ -211,15 +215,15 @@ liveLine.x_range.range_padding=0
 liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
-step = 1 # Step for X range
-zero_list = [0] * 10
-step_list = [i * step for i in range(10)]
+step = 1 # for now not refresh_rate/1000 # Step for X range
+zero_list = [0] * 6
+step_list = [i * step for i in range(6)]
 
-ContainerX = np.empty((ThreadCount,), dtype = object)
-ContainerY = np.empty((ThreadCount,), dtype = object)
+ContainerX = np.empty((ThreadCount,),  dtype = object)
+ContainerY = np.empty((ThreadCount,), dtype =  object)
 colours = []
 for i in range(len(ContainerY)): 
-    ContainerY[i]=[0,0,0,0,0,0,0,0,0,0]
+    ContainerY[i]=[0,0,0,0,0,0]
     ContainerX[i]=step_list 
     colours.append(random.choice(palette2)) #### try to eliminate random
 
@@ -293,45 +297,45 @@ def clicker(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, CPUIdle
+    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow
     idx = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
             msg = data.decode("utf-8")
             if(msg == disconnect_msg):
-                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                line.renderers = []
-                bar.renderers = []
-                select.renderers = []
                 heatmap.renderers = []
+                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                
             else:
                 splitMsg = msg.split(API_DELIMINATOR)
                 idx = int(splitMsg[0])
                 if idx < ThreadCount and idx >= 0:
-                    ThreadLevel[idx] = float(splitMsg[7])
-                    if not idx % n and idx/n < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                    ThreadLevel[idx] = int(float(splitMsg[7]))
+                    modulo = int(idx/n)
+                    if not modulo and idx/n < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
                         if(maxRow < float(splitMsg[1])):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
                             maxRow = float(splitMsg[1])
-                        cacheDataMiss[int(idx/n)].append(float(splitMsg[3]))
-                        cacheDataHit[int(idx/n)].append(float(splitMsg[4]))
-                        cacheDataWB[int(idx/n)].append(float(splitMsg[5]))
-                        CPUIdle[int(idx/n)].append(float(splitMsg[6]))
+                        cacheDataMiss[modulo].append(int(float(splitMsg[3])))
+                        cacheDataHit[modulo].append(int(float(splitMsg[4])))
+                        cacheDataWB[modulo].append(int(float(splitMsg[5])))
+                        CPUIdle[modulo].append(int(float(splitMsg[6])))
                 else:
                     print("idx range is out of bound")
         except Exception as e:
-            print("issue on thread " + str(idx) + " because: " + str(e))
+           print("issue on thread " + str(idx) + " because: " + str(e))
 
 
 
 def plotterUpdater():
     global second_graph, ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active
 
-    print(" IN PLOTTER UPDATER ")
-    print(f"active  {threading.active_count()}")
+    #print(" IN PLOTTER UPDATER ")
+    #print(f"active  {threading.active_count()}")
 
     if(second_graph):
         print(" RENDERING OTHER GRAPHS ")
+        time.sleep(1)
         execution_time2 = execution_time
         usage2 = usage
         # Once numberPoints is known initiliase matrices, This could be guessed at the start thus saving time for the execution
@@ -342,6 +346,8 @@ def plotterUpdater():
         finalWB = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
         finalIdle = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
 
+        ## Depending on application the dtype above should be changed
+
         for i in range(numberPoints):
             for k in range(CoreCount):
                 try:
@@ -349,24 +355,25 @@ def plotterUpdater():
                     finalHit[i] += cacheDataHit[k][i+1]
                     finalWB[i] += cacheDataWB[k][i+1]
                     finalIdle[i] += CPUIdle[k][i+1]
-                except:
-                    print("CORE " + str(k) + " DOESN'T HAVE ROW" + str(i))
-                    finalIdle[i] += 100   # If the value of the core is not reachable, it means that no work was done, hence 100% idle for that time slot
-
+                except Exception as e:
+                   # print("CORE " + str(k) + " DOESN'T HAVE ROW " + str(i))
+                    finalIdle[i] += 210000000   # If the value of the core is not reachable, it means that no work was done, hence 100% idle for that time slot
 
             # Average values to plot system view of Cache Miss Hit WB and CPUIDLE
-            finalMiss[i] = finalMiss[i]/CoreCount
-            finalHit[i] = finalHit[i]/CoreCount
-            finalWB[i] = finalWB[i]/CoreCount
-            finalIdle[i] = finalIdle[i]/(CoreCount * 2100000)    # Division by 21Mhz/100 to get time percentage
+            finalMiss[i] = int(finalMiss[i]/CoreCount)
+            finalHit[i] = int(finalHit[i]/CoreCount)
+            finalWB[i] = int(finalWB[i]/CoreCount)
+            finalIdle[i] = int((finalIdle[i]/CoreCount)/2100000)    # Division by 210Mhz which is frequency specified in Tinsel doc. by 100 to get time percentage
         
-        dataMiss = {'x': range(numberPoints),
+        x_axis = range(numberPoints)
+        
+        dataMiss = {'x': x_axis,
                 'y': finalMiss}
 
-        dataHit = {'x': range(numberPoints),
+        dataHit = {'x': x_axis,
                 'y': finalHit}
 
-        dataWB = {'x': range(numberPoints),
+        dataWB = {'x': x_axis,
                 'y': finalWB}
 
         Miss_line_ds.data = dataMiss
@@ -383,8 +390,7 @@ def plotterUpdater():
             select.toolbar.active_multi = range_tool
 
         range_tool_active = 1
-
-        dataBar = {'x' : range(int(numberPoints)),
+        dataBar = {'x' : x_axis,
                 'top'   : finalIdle}
         
         bar_ds.data = dataBar
@@ -416,29 +422,25 @@ def plotterUpdater():
 
     if not (block):
         if(gap1 == 16):                     ## CORE VIEW
-            length = len(core_count_x) * gap1
             selected_count_x = core_count_x
             selected_count_y = core_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, length ,n)]
+            SelectedLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
 
 
         elif(gap1 == 64):                   ## MAILBOX VIEW
-            length = len(mailbox_count_x) * gap1
             selected_count_x = mailbox_count_x
             selected_count_y = mailbox_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
+            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
 
         elif(gap1 == 1024):                 ## BOARD VIEW
-            length = len(board_count_x) * gap1
             selected_count_x = board_count_x
             selected_count_y = board_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
+            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
 
         else:                               ## BOX VIEW
-            length = len(box_count_x) * gap1
             selected_count_x = box_count_x
             selected_count_y = box_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, length, gap1)]
+            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
 
         heatmap_data = {'x' : selected_count_x,
             'y' : selected_count_y,

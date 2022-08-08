@@ -49,7 +49,7 @@ def main():
     
     fpattern = './visualiser_data/instrumentation_thread_*.csv'
     files = glob.glob(fpattern)
-    processCount = len(files)
+    processCount = 64
     print("number of threads is " + str(processCount))
     for i in range(processCount):
         processes.append(Process(target=fileReader, args=(i,)))
@@ -59,9 +59,8 @@ def main():
     
     for i in range(processCount):
         processes[i].join()
+
     Sock.sendto(disconnect_msg.encode('utf-8'), ADDR)
-
-
 
     
 
