@@ -37,7 +37,7 @@ disconnect_msg = "DISCONNECT"
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 1000 ## Time in millisecond for updating live plots
+refresh_rate = 500 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 n = 16 # number of threads in a core
@@ -309,7 +309,7 @@ def dataUpdater():
                 
             else:
                 splitMsg = msg.split(API_DELIMINATOR)
-                idx = int(splitMsg[0])
+                idx = int(float(splitMsg[0]))
                 if idx < ThreadCount and idx >= 0:
                     ThreadLevel[idx] = int(float(splitMsg[7]))
                     modulo = int(idx/n)
@@ -462,7 +462,7 @@ def plotterUpdater():
             'line_color' : colours}
 
         liveLine_ds.data = new_data_liveLine
-        mapper = linear_cmap(field_name="intensity", palette=colors, low=5000, high=25000)
+        mapper = linear_cmap(field_name="intensity", palette=colors, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
 
     else:
