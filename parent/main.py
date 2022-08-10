@@ -37,7 +37,7 @@ disconnect_msg = "DISCONNECT"
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 500 ## Time in millisecond for updating live plots
+refresh_rate = 2000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 n = 16 # number of threads in a core
@@ -116,14 +116,14 @@ heatmap = figure(height=300, toolbar_location = None,
            x_range=rangex, y_range=rangex, tools="")
 
 #Extra tools available on the webpage
-TOOLS="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
+TOOLSO="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
 
 TOOLTIPS = [("core", "$index"),
             ("TX/s", "@intensity")]
 
 #Set the default option for the Hovertool tooltips
 hover=HoverTool(tooltips=TOOLTIPS)
-heatmap = figure(height = 590, width = 560, tools=[hover, TOOLS], title="Heat Map",  name = "heatmap", toolbar_location="below")
+heatmap = figure(height = 590, width = 560, tools=[hover, TOOLSO], title="Heat Map",  name = "heatmap", toolbar_location="below")
 
 TOOLS="hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
 
@@ -141,8 +141,8 @@ heatmap.xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
 heatmap.toolbar.logo = None
 
 #Fixed heatmap color, going from light green to dark red
-colors = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-bar_map = LinearColorMapper(palette = colors, low = 5000, high = 25000 )
+colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+bar_map = LinearColorMapper(palette = colours, low = 5000, high = 25000 )
 color_bar = ColorBar(color_mapper=bar_map,
                 ticker=SingleIntervalTicker(interval = 2500),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
@@ -204,10 +204,9 @@ bar_ds = barO.data_source
 
 
 #Configurations for Live Line Chart - Used for TX
-
-
-TOOLTIPS = [("Thread", "$index")]
-liveLine = figure(height = 590, width = 720, tools=TOOLS, tooltips = TOOLTIPS, title = "Live Thread Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
+TOOLTIPS2 = [("Core", "$index")]
+hover2=HoverTool(tooltips=TOOLTIPS2)
+liveLine = figure(height = 590, width = 720, tools=[hover2, TOOLSO], title = "Live Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
 liveLine.toolbar.logo = None
 liveLine.x_range.follow="end"
 liveLine.x_range.follow_interval = 30
@@ -216,16 +215,16 @@ liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
 step = 1 # for now not refresh_rate/1000 # Step for X range
-zero_list = [0] * 6
-step_list = [i * step for i in range(6)]
+zero_list = [0] * 4
+step_list = [i * step for i in range(4)]
 
-ContainerX = np.empty((ThreadCount,),  dtype = object)
-ContainerY = np.empty((ThreadCount,), dtype =  object)
-colours = []
+ContainerX = np.empty((CoreCount,),  dtype = object)
+ContainerY = np.empty((CoreCount,), dtype =  object)
+line_colours = []
 for i in range(len(ContainerY)): 
-    ContainerY[i]=[0,0,0,0,0,0]
+    ContainerY[i]=[0,0,0,0]
     ContainerX[i]=step_list 
-    colours.append(random.choice(palette2)) #### try to eliminate random
+    line_colours.append(random.choice(palette2)) #### try to eliminate random
 
 
 liveLineO = liveLine.multi_line(xs = [], ys= [], line_color = []) 
@@ -253,7 +252,7 @@ table_ds = table.source
 second_graph = 0 # Variable used to start other graphs
 block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
-gap2 = 1
+gap2 = 0
 range_tool_active = 0
 
 
@@ -269,30 +268,92 @@ def stopper():
     print("STOPPING live data")
     block = ~block
 
-def clicker(event):
-    global gap1, gap2
-    print(event.item)
+def clicker_h(event):
+    global gap1
+    print(event.item + str(" VIEW FOR LIVE HEATMAP"))
     heatmap.renderers = []
-    if event.item == "BOX":
-        gap1 = 6144
-        gap2 = 384
-        heatmap.tools[0].tooltips = [("box", "$index"),
-                                    ("TX/s", "@intensity")]
-    elif event.item == "BOARD":
-        gap1 = 1024
-        gap2 = 64
-        heatmap.tools[0].tooltips = [("board", "$index"),
-                                    ("TX/s", "@intensity")]
-    elif event.item == "MAILBOX":
-        gap1 = 64
-        gap2 = 4
-        heatmap.tools[0].tooltips = [("mailbox", "$index"),
-                                    ("TX/s", "@intensity")]
-    else:
+
+    if event.item == "CORE":
         gap1 = 16
-        gap2 = 1
         heatmap.tools[0].tooltips = [("core", "$index"),
                                     ("TX/s", "@intensity")]
+                            
+    elif event.item == "MAILBOX":
+        gap1 = 64
+        heatmap.tools[0].tooltips = [("mailbox", "$index"),
+                                    ("TX/s", "@intensity")]
+                                    
+    elif event.item == "BOARD":
+        gap1 = 1024
+        heatmap.tools[0].tooltips = [("board", "$index"),
+                                    ("TX/s", "@intensity")]
+    else:
+        gap1 = 6144
+        heatmap.tools[0].tooltips = [("box", "$index"),
+                                    ("TX/s", "@intensity")]
+
+
+
+def clicker_l(event):
+    global ContainerX, ContainerY, line_colours, gap2
+    print(event.item + str(" VIEW FOR LIVE LINE"))
+    #liveLine.renderers = []
+
+    if event.item == "CORE":
+        ContainerX = np.empty((CoreCount,),  dtype = object)
+        ContainerY = np.empty((CoreCount,), dtype =  object)
+        line_colours = []
+        for i in range(len(ContainerY)): 
+            ContainerY[i]=[0,0,0,0]
+            ContainerX[i]=step_list 
+            line_colours.append(random.choice(palette2)) #### try to eliminate random
+        gap2 = 0
+        liveLine.tools[0].tooltips = [("core", "$index")]
+
+    elif event.item == "THREAD":
+        ContainerX = np.empty((ThreadCount,),  dtype = object)
+        ContainerY = np.empty((ThreadCount,), dtype =  object)
+        line_colours = []
+        for i in range(len(ContainerY)): 
+            ContainerY[i]=[0,0,0,0]
+            ContainerX[i]=step_list 
+            line_colours.append(random.choice(palette2)) #### try to eliminate random
+        gap2 = 1
+        liveLine.tools[0].tooltips = [("thread", "$index")]
+
+    elif event.item == "MAILBOX":
+        ContainerX = np.empty((len(mailbox_count_x,)),  dtype = object)
+        ContainerY = np.empty((len(mailbox_count_y,)), dtype =  object)
+        line_colours = []
+        for i in range(len(ContainerY)): 
+            ContainerY[i]=[0,0,0,0]
+            ContainerX[i]=step_list 
+            line_colours.append(random.choice(palette2)) #### try to eliminate random
+        gap2 = 2
+        liveLine.tools[0].tooltips = [("mailbox", "$index")]
+                                    
+    elif event.item == "BOARD":
+        ContainerX = np.empty((len(board_count_x,)),  dtype = object)
+        ContainerY = np.empty((len(board_count_y,)), dtype =  object)
+        line_colours = []
+        for i in range(len(ContainerY)): 
+            ContainerY[i]=[0,0,0,0]
+            ContainerX[i]=step_list 
+            line_colours.append(random.choice(palette2)) #### try to eliminate random
+        gap2 = 3
+        liveLine.tools[0].tooltips = [("board", "$index")]
+
+    else:
+        ContainerX = np.empty((len(box_count_x,)),  dtype = object)
+        ContainerY = np.empty((len(box_count_y,)), dtype =  object)
+        line_colours = []
+        for i in range(len(ContainerY)): 
+            ContainerY[i]=[0,0,0,0]
+            ContainerX[i]=step_list 
+        line_colours.append(random.choice(palette2)) #### try to eliminate random
+        gap2 = 4
+        liveLine.tools[0].tooltips = [("box", "$index")]
+
 
 
 def dataUpdater():
@@ -424,34 +485,64 @@ def plotterUpdater():
         if(gap1 == 16):                     ## CORE VIEW
             selected_count_x = core_count_x
             selected_count_y = core_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
+            HeatmapLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
 
 
         elif(gap1 == 64):                   ## MAILBOX VIEW
             selected_count_x = mailbox_count_x
             selected_count_y = mailbox_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
+            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
 
         elif(gap1 == 1024):                 ## BOARD VIEW
             selected_count_x = board_count_x
             selected_count_y = board_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
+            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
 
         else:                               ## BOX VIEW
             selected_count_x = box_count_x
             selected_count_y = box_count_y
-            SelectedLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
+            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
+
+        if(gap2 == 0):                     ## CORE VIEW 
+            if(gap1 == 16):
+                LineLevel = HeatmapLevel
+            else:
+                LineLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
+        
+        elif(gap2 == 2):                     ## MAILBOX VIEW 
+            if(gap1 == 64):
+                LineLevel = HeatmapLevel
+            else:
+                LineLevel = [sum(ThreadLevel[j:j+64])//64 for j in range(0, len_mailbox ,64)]
+
+        elif(gap2 == 1):                   ## THREAD VIEW
+            LineLevel = ThreadLevel
+
+        elif(gap2 == 3):                     ## BOARD VIEW 
+            if(gap1 == 1024):
+                LineLevel = HeatmapLevel
+            else:
+                LineLevel = [sum(ThreadLevel[j:j+1024])//1024 for j in range(0, len_mailbox ,1024)]
+        
+        else:
+            if(gap1 == 6144):
+                LineLevel = HeatmapLevel
+            else:
+                LineLevel = [sum(ThreadLevel[j:j+6144])//6144 for j in range(0, len_mailbox ,6144)]
+
+
+
 
         heatmap_data = {'x' : selected_count_x,
             'y' : selected_count_y,
-            'intensity': SelectedLevel}      # was ThreadLevel
+            'intensity': HeatmapLevel}      # was ThreadLevel
         #create a ColumnDataSource by passing the dict
 
         heat_source = ColumnDataSource(data=heatmap_data)
             
         latest = ContainerX[0][-1] + step
         for i in range(len(ContainerY)):
-            ContainerY[i].append(ThreadLevel[i])
+            ContainerY[i].append(LineLevel[i])
             ContainerY[i].pop(0)        # All values change equally
 
         ContainerX[0].append(latest)
@@ -459,10 +550,10 @@ def plotterUpdater():
 
         new_data_liveLine = {'xs' : ContainerX,
             'ys' : ContainerY,
-            'line_color' : colours}
+            'line_color' : line_colours}
 
         liveLine_ds.data = new_data_liveLine
-        mapper = linear_cmap(field_name="intensity", palette=colors, low=0, high=6000) ## was 5k - 25k
+        mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
 
     else:
@@ -489,13 +580,17 @@ curdoc().add_root(bar)
 curdoc().add_root(layout)
 curdoc().add_root(table)
 
-button = Button(label="Stop/Resume", name = "button")
+button = Button(label="Stop/Resume", name = "button", default_size = 150)
 button.on_click(stopper)
 curdoc().add_root(button)
 
-menu = Dropdown(label = "Select Hierarchy", menu = ["BOX", "BOARD", "MAILBOX", "CORE"], name = "menu")
-menu.on_click(clicker)
-curdoc().add_root(menu)
+menu_h = Dropdown(label = "Select Hierarchy", menu = ["BOX", "BOARD", "MAILBOX", "CORE"], name = "menu_h")
+menu_h.on_click(clicker_h)
+curdoc().add_root(menu_h)
+
+menu_l = Dropdown(label = "Select Hierarchy", menu = ["BOX", "BOARD", "MAILBOX", "CORE", "THREAD"], name = "menu_l")
+menu_l.on_click(clicker_l)
+curdoc().add_root(menu_l)
 
 curdoc().title = "POETS Dashboard"
 curdoc().template_variables['stats_names'] = [ 'Threads', 'Cores', 'Refresh']

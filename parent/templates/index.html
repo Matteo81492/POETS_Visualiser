@@ -27,6 +27,7 @@
           <div class="count">{{ stats[name].value }}</div>
         </div>
         {% endfor %}
+        {{ embed(roots.button) }}
       </div>
       <!-- /top tiles -->
 
@@ -34,10 +35,10 @@
         <div class="col-md-5 col-sm-5 col-xs-5">
           <div class="x_panel tile fixed_height_320 overflow_hidden">
             <div class="x_title">
-              <h3>Selected Activation</small></h3>
+              <h3>Heatmap Activation</small></h3>
               <div class="clearfix"></div>
             </div>
-            {{ embed(roots.menu) }}
+            {{ embed(roots.menu_h) }}
             {{ embed(roots.heatmap) }}
           </div>
         </div>
@@ -45,10 +46,10 @@
             <div class="x_panel tile fixed_height_390 overflow_hidden">
               <div class="row x_title">
                 <div class="col-md-6">
-                  <h3>Thread Activation</small></h3>
+                  <h3>Line Activation</small></h3>
                 </div>
               </div>
-              {{ embed(roots.button) }}
+              {{ embed(roots.menu_l) }}
               {{ embed(roots.liveLine) }}
             </div>
           </div>
