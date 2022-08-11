@@ -41,8 +41,6 @@ disconnect_msg = "DISCONNECT"
 refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-ThreadLevel1 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-ThreadLevel2 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
@@ -53,9 +51,7 @@ root_box = int(math.sqrt(ThreadCount / 6144))
 
 CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
-curRow = 0
-counter = 0
-counter1 = 0
+
 
 execution_time = 0
 usage = 0
@@ -357,7 +353,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-        line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2)) #### try to eliminate random
         gap2 = 4
         liveLine.tools[0].tooltips = [("box", "$index")]
 
@@ -365,7 +361,7 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, ThreadLevel1,ThreadLevel2, curRow, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, counter, counter1
+    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow
     idx = 0
     while True:
         try:
@@ -373,34 +369,12 @@ def dataUpdater():
             msg = data.decode("utf-8")
             if(msg == disconnect_msg):
                 second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                curRow = 0
             else:
                 splitMsg = msg.split(API_DELIMINATOR)
                 idx = int(float(splitMsg[0]))
                 cidx = int(float(splitMsg[1]))
                 if idx < ThreadCount and idx >= 0:
-                    if(cidx <= curRow):
-                        ThreadLevel1[idx] = int(float(splitMsg[7]))
-                        counter += 1
-                    else:
-                        ThreadLevel2[idx] = int(float(splitMsg[7]))
-                        counter1 += 1                     
-
-                    if(counter == ThreadCount):
-                        print(str(curRow) + " DONE E E E E E E E E E E E E E E E E E E E E")
-                        curRow += 1
-                        ThreadLevel = ThreadLevel1 + 0
-                        ThreadLevel1 = ThreadLevel2 + 0
-                        ThreadLevel2 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
-                        counter = counter1
-                        counter1 = 0
-                        #print(ThreadLevel)
-                        #print(" 0 TOP 1 BOTTOM")
-                        #print(ThreadLevel1)
-                        #print(" 1 TOP 2 BOTTOM")
-                        #print(ThreadLevel2)
-                        #print(" 2 TOP 3 BOTTOM")
-                        #print(ThreadLevel3)                
+                    ThreadLevel[idx] = int(float(splitMsg[7]))                   
                     div = int(idx/n)
                     if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
                         if(maxRow < float(splitMsg[1])):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
@@ -540,8 +514,10 @@ def plotterUpdater():
         elif(gap2 == 2):                     ## MAILBOX VIEW 
             if(gap1 == 64):
                 LineLevel = HeatmapLevel
+            elif(gap1 == 16):
+                LineLevel = [sum(HeatmapLevel[j:j+4])//4 for j in range(0, int(len_mailbox/16) ,4)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+64])//64 for j in range(0, len_mailbox ,64)]
+                LineLevel = [sum(ThreadLevel[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
 
         elif(gap2 == 1):                   ## THREAD VIEW
             LineLevel = ThreadLevel
@@ -549,14 +525,24 @@ def plotterUpdater():
         elif(gap2 == 3):                     ## BOARD VIEW 
             if(gap1 == 1024):
                 LineLevel = HeatmapLevel
+            elif(gap1 == 16):
+                LineLevel = [sum(HeatmapLevel[j:j+64])//64 for j in range(0, int(len_board/16) ,64)]
+            elif(gap1 == 64):
+                LineLevel = [sum(HeatmapLevel[j:j+16])//16 for j in range(0, int(len_board/64) ,16)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+1024])//1024 for j in range(0, len_mailbox ,1024)]
+                LineLevel = [sum(ThreadLevel[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
         
         else:
             if(gap1 == 6144):
                 LineLevel = HeatmapLevel
+            elif(gap1 == 16):
+                LineLevel = [sum(HeatmapLevel[j:j+384])//384 for j in range(0, int(len_box/16) ,384)]
+            elif(gap1 == 64):
+                LineLevel = [sum(HeatmapLevel[j:j+96])//96 for j in range(0, int(len_box/64) ,96)]
+            elif(gap1 == 1024):
+                LineLevel = [sum(HeatmapLevel[j:j+6])//6 for j in range(0, int(len_box/1024) ,6)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+6144])//6144 for j in range(0, len_mailbox ,6144)]
+                LineLevel = [sum(ThreadLevel[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
 
 
 
