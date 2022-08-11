@@ -51,7 +51,7 @@ root_box = int(math.sqrt(ThreadCount / 6144))
 
 CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
-
+total = 0
 
 execution_time = 0
 usage = 0
@@ -128,7 +128,7 @@ TOOLTIPS = [("core", "$index"),
 hover=HoverTool(tooltips=TOOLTIPS)
 heatmap = figure(height = 590, width = 560, tools=[hover, TOOLSO], title="Heat Map",  name = "heatmap", toolbar_location="below")
 
-TOOLS="hover,crosshair,undo,redo,reset,tap,save,"
+TOOLS="hover,crosshair,undo,redo,reset,tap,save,pan"
 
 
 
@@ -158,6 +158,9 @@ heatmap.add_layout(color_bar, 'right')
 #Configurations for Line plot - Used for Cache Miss - Hit - WB values
 TOOLTIPS = [("second", "$index"),
             ("value", "$y")]
+
+TOOLS="hover,crosshair,undo,redo,reset,tap,save"
+
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
     background_fill_color="#efefef", x_range=(0, 99))
@@ -458,9 +461,6 @@ def plotterUpdater():
         
         bar_ds.data = dataBar
         print(ThreadLevel)
-        total = 0 # value holders for resource utilisation parameter ### bottleneck maybe
-        for e in range(len(ThreadLevel)):
-            total += np.sum(ThreadLevel[e])
 
         usage = round(total/execution_time, 3)
         newTable = {'Application' : table_ds.data['Application'],
@@ -569,6 +569,9 @@ def plotterUpdater():
         liveLine_ds.data = new_data_liveLine
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
+
+        for e in range(len(ThreadLevel)):
+            total += np.sum(ThreadLevel[e])
 
     else:
         print(" blocking callback function ")
