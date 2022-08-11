@@ -1,3 +1,4 @@
+import time
 import sys
 import signal
 import socket
@@ -35,6 +36,9 @@ def main():
         message_str = str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5]) + API_DELIMINATOR + str(s[6]) + API_DELIMINATOR + str(s[7])
         Sock.sendto(message_str.encode('utf-8'), ADDR)
         print(message_str)
+
+    time.sleep(2)
+    print("DISCONNECTING")
     Sock.sendto(disconnect_msg.encode('utf-8'), ADDR)
 
 

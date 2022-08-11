@@ -9,6 +9,7 @@ import math
 import socket
 import time
 import signal
+from typing import Counter
 import numpy as np
 import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
@@ -37,9 +38,12 @@ disconnect_msg = "DISCONNECT"
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 2000 ## Time in millisecond for updating live plots
+refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+ThreadLevel1 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+ThreadLevel2 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
@@ -49,6 +53,9 @@ root_box = int(math.sqrt(ThreadCount / 6144))
 
 CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
+curRow = 0
+counter = 0
+counter1 = 0
 
 execution_time = 0
 usage = 0
@@ -116,7 +123,7 @@ heatmap = figure(height=300, toolbar_location = None,
            x_range=rangex, y_range=rangex, tools="")
 
 #Extra tools available on the webpage
-TOOLSO="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
+TOOLSO="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,"
 
 TOOLTIPS = [("core", "$index"),
             ("TX/s", "@intensity")]
@@ -125,7 +132,7 @@ TOOLTIPS = [("core", "$index"),
 hover=HoverTool(tooltips=TOOLTIPS)
 heatmap = figure(height = 590, width = 560, tools=[hover, TOOLSO], title="Heat Map",  name = "heatmap", toolbar_location="below")
 
-TOOLS="hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,"
+TOOLS="hover,crosshair,undo,redo,reset,tap,save,"
 
 
 
@@ -195,7 +202,7 @@ bar.axis.minor_tick_line_color = None
 bar.outline_line_color = None
 bar.yaxis.formatter = PrintfTickFormatter(format="%d%%")
 bar.xaxis.formatter = PrintfTickFormatter(format="%ss")
-bar.xaxis.ticker = SingleIntervalTicker(interval=1)
+bar.xaxis.ticker = SingleIntervalTicker(interval=10)
 bar.yaxis.ticker = SingleIntervalTicker(interval=10)
 
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
@@ -358,29 +365,50 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow
+    global ThreadLevel, ThreadLevel1,ThreadLevel2, curRow, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, counter, counter1
     idx = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
             msg = data.decode("utf-8")
             if(msg == disconnect_msg):
-                heatmap.renderers = []
                 second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                
+                curRow = 0
             else:
                 splitMsg = msg.split(API_DELIMINATOR)
                 idx = int(float(splitMsg[0]))
+                cidx = int(float(splitMsg[1]))
                 if idx < ThreadCount and idx >= 0:
-                    ThreadLevel[idx] = int(float(splitMsg[7]))
-                    modulo = int(idx/n)
-                    if not modulo and idx/n < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                    if(cidx <= curRow):
+                        ThreadLevel1[idx] = int(float(splitMsg[7]))
+                        counter += 1
+                    else:
+                        ThreadLevel2[idx] = int(float(splitMsg[7]))
+                        counter1 += 1                     
+
+                    if(counter == ThreadCount):
+                        print(str(curRow) + " DONE E E E E E E E E E E E E E E E E E E E E")
+                        curRow += 1
+                        ThreadLevel = ThreadLevel1 + 0
+                        ThreadLevel1 = ThreadLevel2 + 0
+                        ThreadLevel2 = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
+                        counter = counter1
+                        counter1 = 0
+                        #print(ThreadLevel)
+                        #print(" 0 TOP 1 BOTTOM")
+                        #print(ThreadLevel1)
+                        #print(" 1 TOP 2 BOTTOM")
+                        #print(ThreadLevel2)
+                        #print(" 2 TOP 3 BOTTOM")
+                        #print(ThreadLevel3)                
+                    div = int(idx/n)
+                    if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
                         if(maxRow < float(splitMsg[1])):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
                             maxRow = float(splitMsg[1])
-                        cacheDataMiss[modulo].append(int(float(splitMsg[3])))
-                        cacheDataHit[modulo].append(int(float(splitMsg[4])))
-                        cacheDataWB[modulo].append(int(float(splitMsg[5])))
-                        CPUIdle[modulo].append(int(float(splitMsg[6])))
+                        cacheDataMiss[div].append(int(float(splitMsg[3])))
+                        cacheDataHit[div].append(int(float(splitMsg[4])))
+                        cacheDataWB[div].append(int(float(splitMsg[5])))
+                        CPUIdle[div].append(int(float(splitMsg[6])))
                 else:
                     print("idx range is out of bound")
         except Exception as e:
@@ -455,7 +483,7 @@ def plotterUpdater():
                 'top'   : finalIdle}
         
         bar_ds.data = dataBar
-
+        print(ThreadLevel)
         total = 0 # value holders for resource utilisation parameter ### bottleneck maybe
         for e in range(len(ThreadLevel)):
             total += np.sum(ThreadLevel[e])
@@ -476,7 +504,7 @@ def plotterUpdater():
             cacheDataWB[i]=[0,0]
             CPUIdle[i]=[0,0]
 
-        ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount))
+        heatmap.renderers = []
 
         second_graph = 0
 
