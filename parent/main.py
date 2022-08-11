@@ -32,13 +32,14 @@ ADDR = ("::1", PORT)
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_IP) ## Create UDP socket
 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
+sock.settimeout(5)
 disconnect_msg = "DISCONNECT"
 
 
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 1000 ## Time in millisecond for updating live plots
+refresh_rate = 500 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 
@@ -51,6 +52,7 @@ root_box = int(math.sqrt(ThreadCount / 6144))
 
 CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
+entered = 0
 total = 0
 
 execution_time = 0
@@ -159,7 +161,7 @@ heatmap.add_layout(color_bar, 'right')
 TOOLTIPS = [("second", "$index"),
             ("value", "$y")]
 
-TOOLS="hover,crosshair,undo,redo,reset,tap,save"
+TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan"
 
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
@@ -220,7 +222,7 @@ liveLine.x_range.range_padding=0
 liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
-step = 1 # for now not refresh_rate/1000 # Step for X range
+step = refresh_rate/1000 # Step for X range
 zero_list = [0] * 4
 step_list = [i * step for i in range(4)]
 
@@ -362,32 +364,36 @@ def clicker_l(event):
 
 
 
+
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow
+    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, entered
     idx = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
             msg = data.decode("utf-8")
-            if(msg == disconnect_msg):
-                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+            entered = 1
+            splitMsg = msg.split(API_DELIMINATOR)
+            idx = int(float(splitMsg[0]))
+            cidx = int(float(splitMsg[1]))
+            if idx < ThreadCount and idx >= 0:
+                ThreadLevel[idx] = int(float(splitMsg[7]))                   
+                div = int(idx/n)
+                if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                    if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
+                        maxRow = cidx
+                    cacheDataMiss[div].append(int(float(splitMsg[3])))
+                    cacheDataHit[div].append(int(float(splitMsg[4])))
+                    cacheDataWB[div].append(int(float(splitMsg[5])))
+                    CPUIdle[div].append(int(float(splitMsg[6])))
             else:
-                splitMsg = msg.split(API_DELIMINATOR)
-                idx = int(float(splitMsg[0]))
-                cidx = int(float(splitMsg[1]))
-                if idx < ThreadCount and idx >= 0:
-                    ThreadLevel[idx] = int(float(splitMsg[7]))                   
-                    div = int(idx/n)
-                    if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
-                        if(maxRow < float(splitMsg[1])):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
-                            maxRow = float(splitMsg[1])
-                        cacheDataMiss[div].append(int(float(splitMsg[3])))
-                        cacheDataHit[div].append(int(float(splitMsg[4])))
-                        cacheDataWB[div].append(int(float(splitMsg[5])))
-                        CPUIdle[div].append(int(float(splitMsg[6])))
-                else:
-                    print("idx range is out of bound")
+                print("idx range is out of bound")
+        except socket.timeout:
+            if(entered):
+                print(disconnect_msg)
+                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                entered = 0
         except Exception as e:
            print("issue on thread " + str(idx) + " because: " + str(e))
 
@@ -546,7 +552,6 @@ def plotterUpdater():
 
 
 
-
         heatmap_data = {'x' : selected_count_x,
             'y' : selected_count_y,
             'intensity': HeatmapLevel}      # was ThreadLevel
@@ -570,8 +575,8 @@ def plotterUpdater():
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
 
-        for e in range(len(ThreadLevel)):
-            total += np.sum(ThreadLevel[e])
+        #for e in range(len(ThreadLevel)):
+         #   total += np.sum(ThreadLevel[e])
 
     else:
         print(" blocking callback function ")
@@ -616,4 +621,4 @@ curdoc().template_variables['stats'] = {
     'Cores'       : {'icon': None,        'value': 3072,  'label': 'Total Cores'},
     'Refresh'        : {'icon': None,        'value': refresh_rate,  'label': 'Refresh Rate'},
 }
-curdoc().add_periodic_callback(plotterUpdater, refresh_rate) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Ver
+curdoc().add_periodic_callback(plotterUpdater, refresh_rate) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Verz
