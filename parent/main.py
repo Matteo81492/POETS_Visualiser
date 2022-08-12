@@ -34,7 +34,7 @@ sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
 sock.settimeout(5)
 disconnect_msg = "DISCONNECT"
-
+wait = 0
 
 
 # POETS Configurations
@@ -370,40 +370,40 @@ def dataUpdater():
     global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, entered
     idx = 0
     while True:
-        try:
-            data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
-            msg = data.decode("utf-8")
-            entered = 1
-            splitMsg = msg.split(API_DELIMINATOR)
-            idx = int(float(splitMsg[0]))
-            cidx = int(float(splitMsg[1]))
-            if idx < ThreadCount and idx >= 0:
-                ThreadLevel[idx] = int(float(splitMsg[7]))                   
-                div = int(idx/n)
-                if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
-                    if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
-                        maxRow = cidx
-                    cacheDataMiss[div].append(int(float(splitMsg[3])))
-                    cacheDataHit[div].append(int(float(splitMsg[4])))
-                    cacheDataWB[div].append(int(float(splitMsg[5])))
-                    CPUIdle[div].append(int(float(splitMsg[6])))
-            else:
-                print("idx range is out of bound")
-        except socket.timeout:
-            if(entered):
-                print(disconnect_msg)
-                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                entered = 0
-        except Exception as e:
-           print("issue on thread " + str(idx) + " because: " + str(e))
+        if not wait:
+            try:
+                data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
+                msg = data.decode("utf-8")
+                entered = 1
+                splitMsg = msg.split(API_DELIMINATOR)
+                idx = int(float(splitMsg[0]))
+                cidx = int(float(splitMsg[1]))
+                if idx < ThreadCount and idx >= 0:
+                    ThreadLevel[idx] = int(float(splitMsg[7]))                   
+                    div = int(idx/n)
+                    if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                        if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
+                            maxRow = cidx
+                        cacheDataMiss[div].append(int(float(splitMsg[3])))
+                        cacheDataHit[div].append(int(float(splitMsg[4])))
+                        cacheDataWB[div].append(int(float(splitMsg[5])))
+                        CPUIdle[div].append(int(float(splitMsg[6])))
+                else:
+                    print("idx range is out of bound")
+            except socket.timeout:
+                if(entered):
+                    print(disconnect_msg)
+                    second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                    entered = 0
+            except Exception as e:
+                print("issue on thread " + str(idx) + " because: " + str(e))
 
 
 
 def plotterUpdater():
-    global second_graph, ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active
+    global second_graph, ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, wait
 
-    #print(" IN PLOTTER UPDATER ")
-    #print(f"active  {threading.active_count()}")
+    wait = 1
 
     if(second_graph):
         print(" RENDERING OTHER GRAPHS ")
@@ -581,8 +581,8 @@ def plotterUpdater():
     else:
         print(" blocking callback function ")
 
-
-
+    wait = 0
+    
 if sys.version_info[0] < 3:
     print("ERROR: Visualiser must be executed using Python 3")
     sys.exit(-1)
