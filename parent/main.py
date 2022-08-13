@@ -39,9 +39,10 @@ mainQueue = Queue()
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 1500 ## Time in millisecond for updating live plots
+refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
@@ -193,7 +194,7 @@ layout = column(line, select, sizing_mode="scale_width", name="line")
 #Configurations for Bar Chart - Used for CPUIDLE count
 
 TOOLTIPS = [("second", "$index"),
-            ("percentage", "$y")]
+            ("percentage", "@top")]
 
 bar = figure(height = 580, width = 490, title="Bar Chart", name = "bar",
         toolbar_location="below", tools=TOOLS, tooltips = TOOLTIPS, y_range = (0, 100))
@@ -400,8 +401,9 @@ def dataUpdater():
 def bufferUpdater():
     global mainQueue
     while True:
-        mainQueue.put(ThreadLevel, False)
-        time.sleep(0.5)
+        if(entered):
+            mainQueue.put(ThreadLevel, False)
+        time.sleep(1)
 
 def plotterUpdater():
     global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active
@@ -468,7 +470,6 @@ def plotterUpdater():
                 'top'   : finalIdle}
         
         bar_ds.data = dataBar
-        print(ThreadLevel)
 
         usage = round(total/execution_time, 3)
         newTable = {'Application' : table_ds.data['Application'],
@@ -478,7 +479,6 @@ def plotterUpdater():
         table_ds.data = newTable
 
         #######REFRESHING
-        print("REFRESSSSSSSSSSSSSSSSSSSSSSSSSSSSSH")
 
         for i,v in enumerate(range(CoreCount)): 
             cacheDataMiss[i]=[0,0]
@@ -486,12 +486,14 @@ def plotterUpdater():
             cacheDataWB[i]=[0,0]
             CPUIdle[i]=[0,0]
 
-        heatmap.renderers = []
+        empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+        mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
 
         second_graph = 0
 
     if not (block) and not (mainQueue.empty()):
         current_data = mainQueue.get()
+        print(mainQueue.qsize())
 
         if(gap1 == 16):                     ## CORE VIEW
             selected_count_x = core_count_x
