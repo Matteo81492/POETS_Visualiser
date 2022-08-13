@@ -3,6 +3,7 @@
     and a line graph show idle and cache values respectively. The dashboard follows a Bootstrap
     template and is shown locally.
 '''
+from multiprocessing import Queue
 import threading
 import sys
 import math
@@ -34,15 +35,15 @@ sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
 sock.settimeout(5)
 disconnect_msg = "DISCONNECT"
-wait = 0
-
+mainQueue = Queue()
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 500 ## Time in millisecond for updating live plots
+refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-
+mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
+current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
@@ -193,7 +194,7 @@ layout = column(line, select, sizing_mode="scale_width", name="line")
 #Configurations for Bar Chart - Used for CPUIDLE count
 
 TOOLTIPS = [("second", "$index"),
-            ("percentage", "$y")]
+            ("percentage", "@top")]
 
 bar = figure(height = 580, width = 490, title="Bar Chart", name = "bar",
         toolbar_location="below", tools=TOOLS, tooltips = TOOLTIPS, y_range = (0, 100))
@@ -223,14 +224,14 @@ liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
 step = refresh_rate/1000 # Step for X range
-zero_list = [0] * 4
-step_list = [i * step for i in range(4)]
+zero_list = [0] * 5
+step_list = [i * step for i in range(5)]
 
 ContainerX = np.empty((CoreCount,),  dtype = object)
 ContainerY = np.empty((CoreCount,), dtype =  object)
 line_colours = []
 for i in range(len(ContainerY)): 
-    ContainerY[i]=[0,0,0,0]
+    ContainerY[i]=[0,0,0,0,0]
     ContainerX[i]=step_list 
     line_colours.append(random.choice(palette2)) #### try to eliminate random
 
@@ -370,42 +371,45 @@ def dataUpdater():
     global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, entered
     idx = 0
     while True:
-        if not wait:
-            try:
-                data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
-                msg = data.decode("utf-8")
-                entered = 1
-                splitMsg = msg.split(API_DELIMINATOR)
-                idx = int(float(splitMsg[0]))
-                cidx = int(float(splitMsg[1]))
-                if idx < ThreadCount and idx >= 0:
-                    ThreadLevel[idx] = int(float(splitMsg[7]))                   
-                    div = int(idx/n)
-                    if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
-                        if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
-                            maxRow = cidx
-                        cacheDataMiss[div].append(int(float(splitMsg[3])))
-                        cacheDataHit[div].append(int(float(splitMsg[4])))
-                        cacheDataWB[div].append(int(float(splitMsg[5])))
-                        CPUIdle[div].append(int(float(splitMsg[6])))
-                else:
-                    print("idx range is out of bound")
-            except socket.timeout:
-                if(entered):
-                    print(disconnect_msg)
-                    second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                    entered = 0
-            except Exception as e:
-                print("issue on thread " + str(idx) + " because: " + str(e))
+        try:
+            data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
+            msg = data.decode("utf-8")
+            entered = 1
+            splitMsg = msg.split(API_DELIMINATOR)
+            idx = int(float(splitMsg[0]))
+            cidx = int(float(splitMsg[1]))
+            if idx < ThreadCount and idx >= 0:
+                ThreadLevel[idx] = int(float(splitMsg[7]))                   
+                div = int(idx/n)
+                if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                    if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
+                        maxRow = cidx
+                    cacheDataMiss[div].append(int(float(splitMsg[3])))
+                    cacheDataHit[div].append(int(float(splitMsg[4])))
+                    cacheDataWB[div].append(int(float(splitMsg[5])))
+                    CPUIdle[div].append(int(float(splitMsg[6])))
+            else:
+                print("idx range is out of bound")
+        except socket.timeout:
+            if(entered):
+                print(disconnect_msg)
+                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                entered = 0
+        except Exception as e:
+            print("issue on thread " + str(idx) + " because: " + str(e))
 
-
+def bufferUpdater():
+    global mainQueue
+    while True:
+        if(entered):
+            mainQueue.put(ThreadLevel, False)
+        time.sleep(1)
 
 def plotterUpdater():
-    global second_graph, ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, wait
+    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active
 
-    wait = 1
 
-    if(second_graph):
+    if(second_graph) and (mainQueue.empty()):
         print(" RENDERING OTHER GRAPHS ")
         time.sleep(1)
         execution_time2 = execution_time
@@ -466,7 +470,6 @@ def plotterUpdater():
                 'top'   : finalIdle}
         
         bar_ds.data = dataBar
-        print(ThreadLevel)
 
         usage = round(total/execution_time, 3)
         newTable = {'Application' : table_ds.data['Application'],
@@ -476,7 +479,6 @@ def plotterUpdater():
         table_ds.data = newTable
 
         #######REFRESHING
-        print("REFRESSSSSSSSSSSSSSSSSSSSSSSSSSSSSH")
 
         for i,v in enumerate(range(CoreCount)): 
             cacheDataMiss[i]=[0,0]
@@ -484,38 +486,41 @@ def plotterUpdater():
             cacheDataWB[i]=[0,0]
             CPUIdle[i]=[0,0]
 
-        heatmap.renderers = []
+        empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+        mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
 
         second_graph = 0
 
+    if not (block) and not (mainQueue.empty()):
+        current_data = mainQueue.get()
+        print(mainQueue.qsize())
 
-    if not (block):
         if(gap1 == 16):                     ## CORE VIEW
             selected_count_x = core_count_x
             selected_count_y = core_count_y
-            HeatmapLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
+            HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
 
 
         elif(gap1 == 64):                   ## MAILBOX VIEW
             selected_count_x = mailbox_count_x
             selected_count_y = mailbox_count_y
-            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
+            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
 
         elif(gap1 == 1024):                 ## BOARD VIEW
             selected_count_x = board_count_x
             selected_count_y = board_count_y
-            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
+            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
 
         else:                               ## BOX VIEW
             selected_count_x = box_count_x
             selected_count_y = box_count_y
-            HeatmapLevel = [sum(ThreadLevel[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
+            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
 
         if(gap2 == 0):                     ## CORE VIEW 
             if(gap1 == 16):
                 LineLevel = HeatmapLevel
             else:
-                LineLevel = [sum(ThreadLevel[j:j+n])//n for j in range(0, len_core ,n)]
+                LineLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
         
         elif(gap2 == 2):                     ## MAILBOX VIEW 
             if(gap1 == 64):
@@ -523,7 +528,7 @@ def plotterUpdater():
             elif(gap1 == 16):
                 LineLevel = [sum(HeatmapLevel[j:j+4])//4 for j in range(0, int(len_mailbox/16) ,4)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
+                LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
 
         elif(gap2 == 1):                   ## THREAD VIEW
             LineLevel = ThreadLevel
@@ -536,7 +541,7 @@ def plotterUpdater():
             elif(gap1 == 64):
                 LineLevel = [sum(HeatmapLevel[j:j+16])//16 for j in range(0, int(len_board/64) ,16)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
+                LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
         
         else:
             if(gap1 == 6144):
@@ -548,7 +553,7 @@ def plotterUpdater():
             elif(gap1 == 1024):
                 LineLevel = [sum(HeatmapLevel[j:j+6])//6 for j in range(0, int(len_box/1024) ,6)]
             else:
-                LineLevel = [sum(ThreadLevel[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
+                LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
 
 
 
@@ -581,7 +586,6 @@ def plotterUpdater():
     else:
         print(" blocking callback function ")
 
-    wait = 0
     
 if sys.version_info[0] < 3:
     print("ERROR: Visualiser must be executed using Python 3")
@@ -594,6 +598,10 @@ signal.signal(signal.SIGINT, signal_handler)
 dataThread = threading.Thread(name='data',target=dataUpdater)
 dataThread.daemon = True
 dataThread.start()
+
+bufferThread = threading.Thread(name='buffer',target=bufferUpdater)
+bufferThread.daemon = True
+bufferThread.start()
 
 # Setup
 curdoc().add_root(liveLine)
