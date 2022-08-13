@@ -24,7 +24,7 @@ def signal_handler(signal_in, frame):
 
 def main():    
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './new_data/instrumentation_512x512.csv'
+    fName = './new_data/instrumentationx_1024x1024.csv'
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
