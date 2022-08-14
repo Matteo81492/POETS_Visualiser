@@ -44,6 +44,7 @@ ThreadCount = 49152   # The actual number of threads present in a POETS box is 6
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+(ThreadLevel==current_data).all()
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
@@ -399,17 +400,18 @@ def dataUpdater():
             except Exception as e:
                 print("issue on thread " + str(idx) + " because: " + str(e))
         else:
-            time.sleep(2)
+            print("Exiting data updater")
+            break
 
 def bufferUpdater():
     global mainQueue
     while True:
-        if(entered):
+        if(entered) and ((ThreadLevel!=current_data).all()):
             mainQueue.put(ThreadLevel, False)
         time.sleep(1)
 
 def plotterUpdater():
-    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, clearing_buffer
+    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, clearing_buffer, current_data
 
 
     if(second_graph) and (mainQueue.empty()):
@@ -491,11 +493,12 @@ def plotterUpdater():
 
         empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
         mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
-
+        
+        dataThread.start()
         second_graph = 0
 
     if not (block) and not (mainQueue.empty()):
-        if(entered):
+        if not (entered):
             clearing_buffer = 1
         
         current_data = mainQueue.get()
