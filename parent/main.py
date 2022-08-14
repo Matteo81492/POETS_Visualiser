@@ -403,7 +403,9 @@ def bufferUpdater():
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
-        time.sleep(1)
+            for e in range(len(ThreadLevel)):
+                total += np.sum(ThreadLevel[e])
+        time.sleep(0.9)
 
 def plotterUpdater():
     global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data
@@ -489,7 +491,6 @@ def plotterUpdater():
         empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
         mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
         
-        dataThread.start()
         second_graph = 0
 
     if not (block) and not (mainQueue.empty()):
@@ -582,8 +583,7 @@ def plotterUpdater():
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
 
-        #for e in range(len(ThreadLevel)):
-         #   total += np.sum(ThreadLevel[e])
+
 
     else:
         print(" blocking callback function ")
