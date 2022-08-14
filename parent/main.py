@@ -192,6 +192,8 @@ select_ds = selectO.data_source
 layout = column(line, select, sizing_mode="scale_width", name="line")
 
 #Configurations for Bar Chart - Used for CPUIDLE count
+TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan, zoom_in,zoom_out,"
+
 
 TOOLTIPS = [("second", "$index"),
             ("percentage", "@top")]
@@ -210,6 +212,7 @@ bar.xaxis.ticker = SingleIntervalTicker(interval= 10)
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
 bar_ds = barO.data_source
 
+TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan"
 
 
 #Configurations for Live Line Chart - Used for TX
@@ -472,7 +475,7 @@ def plotterUpdater():
         if(execution_time >= 100):
             gr = int(execution_time/100)
             finalIdle = [sum(finalIdle[j:j+gr])//gr for j in range(0, len(finalIdle) ,gr)]
-            x_axis = range(numberPoints/gr)
+            x_axis = range(1, int(numberPoints/gr)+1)
 
         dataBar = {'x' : x_axis,
                 'top'   : finalIdle}
