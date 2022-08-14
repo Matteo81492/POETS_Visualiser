@@ -56,7 +56,6 @@ CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
 entered = 0
 total = 0
-clearing_buffer = 0
 execution_time = 0
 usage = 0
 
@@ -372,46 +371,42 @@ def dataUpdater():
     global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, entered
     idx = 0
     while True:
-        if not(clearing_buffer):
-            try:
-                data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
-                msg = data.decode("utf-8")
-                entered = 1
-                splitMsg = msg.split(API_DELIMINATOR)
-                idx = int(float(splitMsg[0]))
-                cidx = int(float(splitMsg[1]))
-                if idx < ThreadCount and idx >= 0:
-                    ThreadLevel[idx] = int(float(splitMsg[7]))                   
-                    div = int(idx/n)
-                    if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
-                        if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
-                            maxRow = cidx
-                        cacheDataMiss[div].append(int(float(splitMsg[3])))
-                        cacheDataHit[div].append(int(float(splitMsg[4])))
-                        cacheDataWB[div].append(int(float(splitMsg[5])))
-                        CPUIdle[div].append(int(float(splitMsg[6])))
-                else:
-                    print("idx range is out of bound")
-            except socket.timeout:
-                if(entered):
-                    print(disconnect_msg)
-                    second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                    entered = 0
-            except Exception as e:
-                print("issue on thread " + str(idx) + " because: " + str(e))
-        else:
-            print("Exiting data updater")
-            break
+        try:
+            data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
+            msg = data.decode("utf-8")
+            entered = 1
+            splitMsg = msg.split(API_DELIMINATOR)
+            idx = int(float(splitMsg[0]))
+            cidx = int(float(splitMsg[1]))
+            if idx < ThreadCount and idx >= 0:
+                ThreadLevel[idx] = int(float(splitMsg[7]))                   
+                div = int(idx/n)
+                if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
+                    if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
+                        maxRow = cidx
+                    cacheDataMiss[div].append(int(float(splitMsg[3])))
+                    cacheDataHit[div].append(int(float(splitMsg[4])))
+                    cacheDataWB[div].append(int(float(splitMsg[5])))
+                    CPUIdle[div].append(int(float(splitMsg[6])))
+            else:
+                print("idx range is out of bound")
+        except socket.timeout:
+            if(entered):
+                print(disconnect_msg)
+                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                entered = 0
+        except Exception as e:
+            print("issue on thread " + str(idx) + " because: " + str(e))
 
 def bufferUpdater():
     global mainQueue
     while True:
-        if(entered) and ((ThreadLevel!=current_data).all()):
+        if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
         time.sleep(1)
 
 def plotterUpdater():
-    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, clearing_buffer, current_data
+    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data
 
 
     if(second_graph) and (mainQueue.empty()):
@@ -498,8 +493,6 @@ def plotterUpdater():
         second_graph = 0
 
     if not (block) and not (mainQueue.empty()):
-        if not (entered):
-            clearing_buffer = 1
         
         current_data = mainQueue.get()
         print(mainQueue.qsize())
@@ -593,7 +586,6 @@ def plotterUpdater():
          #   total += np.sum(ThreadLevel[e])
 
     else:
-        clearing_buffer = 0
         print(" blocking callback function ")
 
     
