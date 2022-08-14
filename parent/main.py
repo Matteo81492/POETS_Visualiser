@@ -204,8 +204,8 @@ bar.axis.minor_tick_line_color = None
 bar.outline_line_color = None
 bar.yaxis.formatter = PrintfTickFormatter(format="%d%%")
 bar.xaxis.formatter = PrintfTickFormatter(format="%ss")
-bar.xaxis.ticker = SingleIntervalTicker(interval=10)
 bar.yaxis.ticker = SingleIntervalTicker(interval=10)
+bar.xaxis.ticker = SingleIntervalTicker(interval= 10)
 
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
 bar_ds = barO.data_source
@@ -399,7 +399,7 @@ def dataUpdater():
             print("issue on thread " + str(idx) + " because: " + str(e))
 
 def bufferUpdater():
-    global mainQueue
+    global mainQueue, total
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
@@ -468,9 +468,15 @@ def plotterUpdater():
             select.toolbar.active_multi = range_tool
 
         range_tool_active = 1
+        ## 100 barrier to choose division
+        if(execution_time >= 100):
+            gr = int(execution_time/100)
+            finalIdle = [sum(finalIdle[j:j+gr])//gr for j in range(0, len(finalIdle) ,gr)]
+            x_axis = range(numberPoints/gr)
+
         dataBar = {'x' : x_axis,
                 'top'   : finalIdle}
-        
+
         bar_ds.data = dataBar
 
         usage = round(total/execution_time, 3)
