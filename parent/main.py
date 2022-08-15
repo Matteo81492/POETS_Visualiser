@@ -140,10 +140,7 @@ if(root_core <= 20):
     jump = 1
 else:
     jump = root_core/10
-heatmap.xaxis.ticker = SingleIntervalTicker(interval=jump)
-heatmap.yaxis.ticker = SingleIntervalTicker(interval=jump)
-heatmap.yaxis.minor_tick_line_color = None  # turn off y-axis minor ticks
-heatmap.xaxis.minor_tick_line_color = None  # turn off x-axis minor ticks
+heatmap.axis.visible = False
 heatmap.toolbar.logo = None
 
 #Fixed heatmap color, going from light green to dark red
@@ -224,6 +221,7 @@ liveLine.x_range.follow="end"
 liveLine.x_range.follow_interval = 30
 liveLine.x_range.range_padding=0
 liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
+liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
 step = refresh_rate/1000 # Step for X range
@@ -304,7 +302,7 @@ def clicker_h(event):
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
-
+    mainQueue.put(ThreadLevel)
 
 def clicker_l(event):
     global ContainerX, ContainerY, line_colours, gap2
@@ -365,6 +363,7 @@ def clicker_l(event):
             line_colours.append(random.choice(palette2)) #### try to eliminate random
         gap2 = 4
         liveLine.tools[0].tooltips = [("box", "$index")]
+    mainQueue.put(ThreadLevel)
 
 
 
@@ -473,9 +472,9 @@ def plotterUpdater():
         range_tool_active = 1
         ## 100 barrier to choose division
         if(execution_time >= 100):
-            gr = int(execution_time/100)
+            gr = round(execution_time/100)
             finalIdle = [sum(finalIdle[j:j+gr])//gr for j in range(0, len(finalIdle) ,gr)]
-            x_axis = range(1, int(numberPoints/gr)+1)
+            x_axis = range(1, numberPoints+1, gr)
 
         dataBar = {'x' : x_axis,
                 'top'   : finalIdle}
@@ -590,8 +589,8 @@ def plotterUpdater():
 
         liveLine_ds.data = new_data_liveLine
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
-        heatmap.rect(x='x',  y='y', width = 1, height = 1, source = heat_source, fill_color=mapper, line_color = "grey")
-
+        heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
+    ## Change into actual rectangles and take away axis info
 
 
     else:

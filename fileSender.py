@@ -24,11 +24,11 @@ def signal_handler(signal_in, frame):
 
 def main():    
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './new_data/instrumentationx_1024x1024.csv'
+    fName = './new_data/instrumentation_512x512.csv'
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
-                            skiprows=2, max_rows=None, usecols=(0, 1, 12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
+                            skiprows=1, max_rows=None, usecols=(0, 1, 12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
     except Exception as e:
         print("Couldn't open file because " + str(e))
     
