@@ -225,7 +225,7 @@ table = DataTable(source=source, columns=columns, height=210, width=330, name="t
 table_ds = table.source
 
 
-second_graph = 0 # Variable used to start other graphs
+finished = 0 # Variable used to start other graphs
 block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
 gap2 = 0
@@ -336,7 +336,7 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, second_graph, maxRow, entered, plot, counter1
+    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1
     idx = 0
     counter1 = 0
     cacheDataMiss1 = 0
@@ -384,7 +384,7 @@ def dataUpdater():
         except socket.timeout:
             if(entered):
                 print(disconnect_msg)
-                second_graph = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                finished = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
                 entered = 0
         except Exception as e:
             print("issue on thread " + str(idx) + " because: " + str(e))
@@ -399,10 +399,10 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data, plot
+    global finished, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data, plot
 
     
-    if(second_graph) and (mainQueue.empty()):
+    if(finished) and (mainQueue.empty()):
         print(" RENDERING OTHER GRAPHS ")
         execution_time2 = execution_time
         usage2 = usage
@@ -434,7 +434,7 @@ def plotterUpdater():
         empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
         mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
         
-        second_graph = 0
+        finished = 0
 
     if not (block) and not (mainQueue.empty()):
         
@@ -526,34 +526,34 @@ def plotterUpdater():
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
-        if(plot):
-            plot = 0
-            finalIdle = int((CPUIdle1 + (counter1*210000000))/(CoreCount*2100000))
-            finalMiss = int(cacheDataMiss1/CoreCount)
-            finalHit = int(cacheDataHit1/CoreCount)
-            finalWB = int(cacheDataWB1/CoreCount)            
+    if(plot) and not (finished):
+        plot = 0
+        finalIdle = int((CPUIdle1 + (counter1*210000000))/(CoreCount*2100000))
+        finalMiss = int(cacheDataMiss1/CoreCount)
+        finalHit = int(cacheDataHit1/CoreCount)
+        finalWB = int(cacheDataWB1/CoreCount)            
 
-            dataBar = dict()
-            dataBar['x'] = bar_ds.data['x'] + [maxRow]
-            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
-            bar_ds.data = dataBar
-            
-            dataMiss = dict()
-            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
-            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
-            Miss_line_ds.data = dataMiss
+        dataBar = dict()
+        dataBar['x'] = bar_ds.data['x'] + [maxRow]
+        dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+        bar_ds.data = dataBar
+        
+        dataMiss = dict()
+        dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
+        dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+        Miss_line_ds.data = dataMiss
 
-            dataHit = dict()
-            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
-            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
-            Hit_line_ds.data = dataHit
+        dataHit = dict()
+        dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
+        dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+        Hit_line_ds.data = dataHit
 
-            dataWB = dict()
-            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
-            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
-            WB_line_ds.data = dataWB
+        dataWB = dict()
+        dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
+        dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+        WB_line_ds.data = dataWB
 
-            select_ds.data = dataMiss
+        select_ds.data = dataMiss
 
 
     else:

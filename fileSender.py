@@ -22,7 +22,8 @@ def signal_handler(signal_in, frame):
     sys.exit(0)
   
 
-def main():    
+def main():
+    current = 0  
     signal.signal(signal.SIGINT, signal_handler)
     fName = './new_data/instrumentation_512x512.csv'
     try:
@@ -33,14 +34,15 @@ def main():
         print("Couldn't open file because " + str(e))
     
     for s in (data):
+        if(s[1]>current):
+            current = s[1]
+            time.sleep(1)
         message_str = str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5]) + API_DELIMINATOR + str(s[6]) + API_DELIMINATOR + str(s[7])
         Sock.sendto(message_str.encode('utf-8'), ADDR)
         print(message_str)
 
     time.sleep(2)
     print("DISCONNECTING")
-    Sock.sendto(disconnect_msg.encode('utf-8'), ADDR)
-
 
 if __name__ == '__main__':
     main()
