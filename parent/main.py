@@ -13,8 +13,8 @@ import signal
 import numpy as np
 import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
-                          LinearColorMapper, PrintfTickFormatter, RangeTool, HoverTool,
-                          NumberFormatter, RangeTool, StringFormatter, TableColumn)
+                          LinearColorMapper, PrintfTickFormatter, HoverTool,
+                          NumberFormatter, RangeTool, Range1d, StringFormatter, TableColumn)
 from bokeh.plotting import figure, curdoc
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.models import Button, Dropdown
@@ -38,7 +38,7 @@ mainQueue = Queue()
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 1000 ## Time in millisecond for updating live plots
+refresh_rate = 890 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
@@ -161,7 +161,7 @@ TOOLTIPS = [("second", "$index"),
 
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
-    background_fill_color="#efefef", x_range=(0, 99))
+    background_fill_color="#efefef")
 line.toolbar.logo = None
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
@@ -409,8 +409,7 @@ def plotterUpdater():
         execution_time = maxRow + 1
 
 
-
-        range_tool = RangeTool(x_range=line.x_range)
+        range_tool = RangeTool(x_range = Range1d(0, execution_time+1))
         range_tool.overlay.fill_color = "navy"
         range_tool.overlay.fill_alpha = 0.2
 
