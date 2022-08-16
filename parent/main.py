@@ -10,7 +10,6 @@ import math
 import socket
 import time
 import signal
-from typing import Counter
 import numpy as np
 import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
@@ -44,13 +43,11 @@ ThreadCount = 49152   # The actual number of threads present in a POETS box is 6
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-(ThreadLevel==current_data).all()
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
 root_board = int(math.sqrt(ThreadCount / 1024))
 root_box = int(math.sqrt(ThreadCount / 6144))
-
 
 CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
@@ -59,88 +56,63 @@ total = 0
 execution_time = 0
 usage = 0
 
-# Matrices for non-live Graphs, each index represents a thread and each element is a new time instance
-# all per-core graphs
-############################################################################
-cacheDataMiss=np.empty((CoreCount,), dtype = object)
-cacheDataHit=np.empty((CoreCount,), dtype =  object)
-cacheDataWB=np.empty((CoreCount,), dtype = object)
-CPUIdle=np.empty((CoreCount,), dtype = object)
-
-for i,v in enumerate(range(CoreCount)): 
-    cacheDataMiss[i]=[0,0]
-    cacheDataHit[i]=[0,0]
-    cacheDataWB[i]=[0,0]
-    CPUIdle[i]=[0,0]
-
 
 # Plot Configurations
 ############################################################################
-row_x = [x + 0.5 for x in range(root_core)] #To define central square coordinates, a 0.5 offset is needed
+row_x = [x for x in range(root_core)] #To define central square coordinates, a 0.5 offset is needed
 core_count_x = []
 core_count_y = []
 for i in range(root_core):
     core_count_x.extend(row_x)
-    column_y = [i+0.5 for x in range(root_core)]
+    column_y = [i*2 for x in range(root_core)]
     core_count_y.extend(column_y)
 len_core = len(core_count_x) * 16
 
-row_x = [x + 0.5 for x in range(root_mailbox)]
+
+
+row_x = [x for x in range(root_mailbox)]
 mailbox_count_x = []
 mailbox_count_y = []
 for i in range(root_mailbox):
     mailbox_count_x.extend(row_x)
-    column_y = [i+0.5 for x in range(root_mailbox)]
+    column_y = [i * 2 for x in range(root_mailbox)]
     mailbox_count_y.extend(column_y)
 len_mailbox = len(mailbox_count_x) * 64
 
-row_x = [x + 0.5 for x in range(root_board)]
+
+row_x = [x for x in range(root_board)]
 board_count_x = []
 board_count_y = []
 for i in range(root_board+2):     ## + 2 because two extra rows are needed to reach 48 board count
     board_count_x.extend(row_x)
-    column_y = [i+0.5 for x in range(root_board)]
+    column_y = [i*2 for x in range(root_board)]
     board_count_y.extend(column_y)
 len_board = len(board_count_x) * 1024
 
-row_x = [x + 0.5 for x in range(root_box)]
+
+row_x = [x for x in range(root_box)]
 box_count_x = []
 box_count_y = []
 for i in range(root_box+2):     ## + 2 because two extra rows are needed to reach 8 box count
     box_count_x.extend(row_x)
-    column_y = [i+0.5 for x in range(root_box)]
+    column_y = [i*2 for x in range(root_box)]
     box_count_y.extend(column_y)
 len_box = len(box_count_x) * 6144
 
-
-#The ranges must be strings
-rangex = list((str(x) for x in range(CoreCount)))
-
 #Configurations for Heatmap - Used for TX/S values
 
-heatmap = figure(height=300, toolbar_location = None,
-           x_range=rangex, y_range=rangex, tools="")
-
 #Extra tools available on the webpage
-TOOLSO="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,"
+TOOLS="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,"
 
 TOOLTIPS = [("core", "$index"),
             ("TX/s", "@intensity")]
 
 #Set the default option for the Hovertool tooltips
 hover=HoverTool(tooltips=TOOLTIPS)
-heatmap = figure(height = 590, width = 560, tools=[hover, TOOLSO], title="Heat Map",  name = "heatmap", toolbar_location="below")
+heatmap = figure(width = 560, height = 600, tools=[hover, TOOLS], title="Heat Map",  name = "heatmap", toolbar_location="below")
 
-TOOLS="hover,crosshair,undo,redo,reset,tap,save,pan"
-
-
-
-#The axis tick interval depends on the size of the graphs
-if(root_core <= 20):
-    jump = 1
-else:
-    jump = root_core/10
 heatmap.axis.visible = False
+heatmap.grid.visible = False
 heatmap.toolbar.logo = None
 
 #Fixed heatmap color, going from light green to dark red
@@ -153,13 +125,39 @@ color_bar = ColorBar(color_mapper=bar_map,
 heatmap.add_layout(color_bar, 'right')
 
 
+#Configurations for Live Line Chart - Used for TX
+TOOLTIPS2 = [("Core", "$index")]
+hover2=HoverTool(tooltips=TOOLTIPS2)
+liveLine = figure(height = 590, width = 720, tools=[hover2, TOOLS], title = "Live Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
+liveLine.toolbar.logo = None
+liveLine.x_range.follow="end"
+liveLine.x_range.follow_interval = 30
+liveLine.x_range.range_padding=0
+liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
+liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
+liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
+step = refresh_rate/1000 # Step for X range
+zero_list = [0] * 5
+step_list = [i * step for i in range(5)]
+
+ContainerX = np.empty((CoreCount,),  dtype = object)
+ContainerY = np.empty((CoreCount,), dtype =  object)
+line_colours = []
+for i in range(len(ContainerY)): 
+    ContainerY[i]=[0,0,0,0,0]
+    ContainerX[i]=step_list 
+    line_colours.append(random.choice(palette2)) #### try to eliminate random
+
+
+liveLineO = liveLine.multi_line(xs = [], ys= [], line_color = []) 
+liveLine_ds = liveLineO.data_source
+
+TOOLS="hover,crosshair,undo,redo,reset,tap,save,pan"
 
 #Configurations for Line plot - Used for Cache Miss - Hit - WB values
 TOOLTIPS = [("second", "$index"),
             ("value", "$y")]
-
-TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan"
 
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
@@ -191,7 +189,6 @@ layout = column(line, select, sizing_mode="scale_width", name="line")
 #Configurations for Bar Chart - Used for CPUIDLE count
 TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan, zoom_in,zoom_out,"
 
-
 TOOLTIPS = [("second", "$index"),
             ("percentage", "@top")]
 
@@ -209,36 +206,7 @@ bar.xaxis.ticker = SingleIntervalTicker(interval= 10)
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
 bar_ds = barO.data_source
 
-TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan"
 
-
-#Configurations for Live Line Chart - Used for TX
-TOOLTIPS2 = [("Core", "$index")]
-hover2=HoverTool(tooltips=TOOLTIPS2)
-liveLine = figure(height = 590, width = 720, tools=[hover2, TOOLSO], title = "Live Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
-liveLine.toolbar.logo = None
-liveLine.x_range.follow="end"
-liveLine.x_range.follow_interval = 30
-liveLine.x_range.range_padding=0
-liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
-liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
-liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
-
-step = refresh_rate/1000 # Step for X range
-zero_list = [0] * 5
-step_list = [i * step for i in range(5)]
-
-ContainerX = np.empty((CoreCount,),  dtype = object)
-ContainerY = np.empty((CoreCount,), dtype =  object)
-line_colours = []
-for i in range(len(ContainerY)): 
-    ContainerY[i]=[0,0,0,0,0]
-    ContainerX[i]=step_list 
-    line_colours.append(random.choice(palette2)) #### try to eliminate random
-
-
-liveLineO = liveLine.multi_line(xs = [], ys= [], line_color = []) 
-liveLine_ds = liveLineO.data_source
 
 ## Configuration for text graph showing post-run parameters
 tdata = {'Application' : ["current","previous"],
@@ -253,8 +221,6 @@ columns = [
                 formatter=NumberFormatter(text_align="right")),
 ]
 table = DataTable(source=source, columns=columns, height=210, width=330, name="table", sizing_mode="scale_both")
-
-curdoc().add_root(table)
 
 table_ds = table.source
 
@@ -307,7 +273,6 @@ def clicker_h(event):
 def clicker_l(event):
     global ContainerX, ContainerY, line_colours, gap2
     print(event.item + str(" VIEW FOR LIVE LINE"))
-    #liveLine.renderers = []
 
     if event.item == "CORE":
         ContainerX = np.empty((CoreCount,),  dtype = object)
@@ -363,6 +328,7 @@ def clicker_l(event):
             line_colours.append(random.choice(palette2)) #### try to eliminate random
         gap2 = 4
         liveLine.tools[0].tooltips = [("box", "$index")]
+
     mainQueue.put(ThreadLevel)
 
 
@@ -370,8 +336,19 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, second_graph, maxRow, entered
+    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, second_graph, maxRow, entered, plot, counter1
     idx = 0
+    counter1 = 0
+    cacheDataMiss1 = 0
+    cacheDataHit1 = 0
+    cacheDataWB1 = 0
+    CPUIdle1 = 0
+    counter2 = 0
+    cacheDataMiss2 = 0
+    cacheDataHit2 = 0
+    cacheDataWB2 = 0
+    CPUIdle2 = 0
+    plot = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
@@ -386,10 +363,22 @@ def dataUpdater():
                 if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
                     if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
                         maxRow = cidx
-                    cacheDataMiss[div].append(int(float(splitMsg[3])))
-                    cacheDataHit[div].append(int(float(splitMsg[4])))
-                    cacheDataWB[div].append(int(float(splitMsg[5])))
-                    CPUIdle[div].append(int(float(splitMsg[6])))
+                        plot = 1
+                        CPUIdle1 = CPUIdle2
+                        CPUIdle2 = 0
+                        cacheDataMiss1 = cacheDataMiss2
+                        cacheDataMiss2 = 0
+                        cacheDataHit1 = cacheDataHit2
+                        cacheDataHit2 = 0
+                        cacheDataWB1 = cacheDataWB2
+                        cacheDataWB2 = 0
+                        counter1 = CoreCount - counter2
+                        counter2 = 0
+                    cacheDataMiss2 += (int(float(splitMsg[3])))
+                    cacheDataHit2 += (int(float(splitMsg[4])))
+                    cacheDataWB2 += (int(float(splitMsg[5])))
+                    CPUIdle2 += (int(float(splitMsg[6])))
+                    counter2 += 1
             else:
                 print("idx range is out of bound")
         except socket.timeout:
@@ -410,56 +399,16 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data
+    global second_graph, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data, plot
 
-
+    
     if(second_graph) and (mainQueue.empty()):
         print(" RENDERING OTHER GRAPHS ")
-        time.sleep(1)
         execution_time2 = execution_time
         usage2 = usage
-        # Once numberPoints is known initiliase matrices, This could be guessed at the start thus saving time for the execution
-        numberPoints = int(maxRow) + 2      ## Add by two for the offset
-        execution_time = maxRow + 1     ## The maximum number of rows indicates the total execution time in seconds
-        finalMiss = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
-        finalHit = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
-        finalWB = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
-        finalIdle = np.ndarray(numberPoints, buffer=np.zeros(numberPoints))
+        execution_time = maxRow + 1
 
-        ## Depending on application the dtype above should be changed
 
-        for i in range(numberPoints):
-            for k in range(CoreCount):
-                try:
-                    finalMiss[i] += cacheDataMiss[k][i+1]
-                    finalHit[i] += cacheDataHit[k][i+1]
-                    finalWB[i] += cacheDataWB[k][i+1]
-                    finalIdle[i] += CPUIdle[k][i+1]
-                except Exception as e:
-                   # print("CORE " + str(k) + " DOESN'T HAVE ROW " + str(i))
-                    finalIdle[i] += 210000000   # If the value of the core is not reachable, it means that no work was done, hence 100% idle for that time slot
-
-            # Average values to plot system view of Cache Miss Hit WB and CPUIDLE
-            finalMiss[i] = int(finalMiss[i]/CoreCount)
-            finalHit[i] = int(finalHit[i]/CoreCount)
-            finalWB[i] = int(finalWB[i]/CoreCount)
-            finalIdle[i] = int((finalIdle[i]/CoreCount)/2100000)    # Division by 210Mhz which is frequency specified in Tinsel doc. by 100 to get time percentage
-        
-        x_axis = range(numberPoints)
-        
-        dataMiss = {'x': x_axis,
-                'y': finalMiss}
-
-        dataHit = {'x': x_axis,
-                'y': finalHit}
-
-        dataWB = {'x': x_axis,
-                'y': finalWB}
-
-        Miss_line_ds.data = dataMiss
-        Hit_line_ds.data = dataHit
-        WB_line_ds.data = dataWB
-        select_ds.data = dataMiss
 
         range_tool = RangeTool(x_range=line.x_range)
         range_tool.overlay.fill_color = "navy"
@@ -470,32 +419,18 @@ def plotterUpdater():
             select.toolbar.active_multi = range_tool
 
         range_tool_active = 1
-        ## 100 barrier to choose division
-        if(execution_time >= 100):
-            gr = round(execution_time/100)
-            finalIdle = [sum(finalIdle[j:j+gr])//gr for j in range(0, len(finalIdle) ,gr)]
-            x_axis = range(1, numberPoints+1, gr)
 
-        dataBar = {'x' : x_axis,
-                'top'   : finalIdle}
 
-        bar_ds.data = dataBar
 
         usage = round(total/execution_time, 3)
         newTable = {'Application' : table_ds.data['Application'],
                 'Execution Time'   : [execution_time, execution_time2],
                 'Average Utilisation' : [usage, usage2]}
-
         table_ds.data = newTable
 
         #######REFRESHING
-
-        for i,v in enumerate(range(CoreCount)): 
-            cacheDataMiss[i]=[0,0]
-            cacheDataHit[i]=[0,0]
-            cacheDataWB[i]=[0,0]
-            CPUIdle[i]=[0,0]
-
+        heatmap.renderers = []
+        liveLine.renderers = []
         empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
         mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
         
@@ -590,7 +525,35 @@ def plotterUpdater():
         liveLine_ds.data = new_data_liveLine
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
-    ## Change into actual rectangles and take away axis info
+
+        if(plot):
+            plot = 0
+            finalIdle = int((CPUIdle1 + (counter1*210000000))/(CoreCount*2100000))
+            finalMiss = int(cacheDataMiss1/CoreCount)
+            finalHit = int(cacheDataHit1/CoreCount)
+            finalWB = int(cacheDataWB1/CoreCount)            
+
+            dataBar = dict()
+            dataBar['x'] = bar_ds.data['x'] + [maxRow]
+            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+            bar_ds.data = dataBar
+            
+            dataMiss = dict()
+            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+            Miss_line_ds.data = dataMiss
+
+            dataHit = dict()
+            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
+            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+            Hit_line_ds.data = dataHit
+
+            dataWB = dict()
+            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
+            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+            WB_line_ds.data = dataWB
+
+            select_ds.data = dataMiss
 
 
     else:
@@ -619,6 +582,7 @@ curdoc().add_root(heatmap)
 curdoc().add_root(bar)
 curdoc().add_root(layout)
 curdoc().add_root(table)
+
 
 button = Button(label="Stop/Resume", name = "button", default_size = 150)
 button.on_click(stopper)
