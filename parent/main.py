@@ -161,7 +161,7 @@ TOOLTIPS = [("second", "$index"),
 
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
-    background_fill_color="#efefef")
+    background_fill_color="#efefef", x_range = (0, 10))
 line.toolbar.logo = None
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
@@ -407,20 +407,6 @@ def plotterUpdater():
         execution_time2 = execution_time
         usage2 = usage
         execution_time = maxRow + 1
-
-
-        range_tool = RangeTool(x_range = Range1d(0, execution_time+1))
-        range_tool.overlay.fill_color = "navy"
-        range_tool.overlay.fill_alpha = 0.2
-
-        if(range_tool_active == 0):
-            select.add_tools(range_tool)
-            select.toolbar.active_multi = range_tool
-
-        range_tool_active = 1
-
-
-
         usage = round(total/execution_time, 3)
         newTable = {'Application' : table_ds.data['Application'],
                 'Execution Time'   : [execution_time, execution_time2],
@@ -553,6 +539,14 @@ def plotterUpdater():
         WB_line_ds.data = dataWB
 
         select_ds.data = dataMiss
+
+        if(range_tool_active == 0):
+            range_tool = RangeTool(x_range = line.x_range)
+            range_tool.overlay.fill_color = "navy"
+            range_tool.overlay.fill_alpha = 0.2
+            select.add_tools(range_tool)
+            select.toolbar.active_multi = range_tool
+            range_tool_active = 1
 
 
     else:
