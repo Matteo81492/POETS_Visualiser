@@ -161,7 +161,7 @@ TOOLTIPS = [("second", "$index"),
 
 line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
-    background_fill_color="#efefef", x_range = (0, 10))
+    background_fill_color="#efefef", x_range = (0, 99))
 line.toolbar.logo = None
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
@@ -418,7 +418,13 @@ def plotterUpdater():
         liveLine.renderers = []
         empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
         mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
-        
+        range_tool = RangeTool(x_range = line.x_range)
+        range_tool.overlay.fill_color = "navy"
+        range_tool.overlay.fill_alpha = 0.2
+        if(range_tool_active == 0):
+            select.add_tools(range_tool)
+            select.toolbar.active_multi = range_tool
+            range_tool_active = 1
         finished = 0
 
     if not (block) and not (mainQueue.empty()):
@@ -538,16 +544,7 @@ def plotterUpdater():
         dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
         WB_line_ds.data = dataWB
 
-        select_ds.data = dataMiss
-
-        if(range_tool_active == 0):
-            range_tool = RangeTool(x_range = line.x_range)
-            range_tool.overlay.fill_color = "navy"
-            range_tool.overlay.fill_alpha = 0.2
-            select.add_tools(range_tool)
-            select.toolbar.active_multi = range_tool
-            range_tool_active = 1
-
+        select_ds.data = dataWB
 
     else:
         print(" blocking callback function ")
