@@ -345,11 +345,11 @@ def dataUpdater():
     cacheDataHit1 = 0
     cacheDataWB1 = 0
     CPUIdle1 = 0
-    counter =  [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
-    cacheDataMiss = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
-    cacheDataHit = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16) 
-    cacheDataWB = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
-    CPUIdle = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    counter =  [0] * 5 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    cacheDataMiss = [0] * 5 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    cacheDataHit = [0] * 5 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16) 
+    cacheDataWB = [0] * 5 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    CPUIdle = [0] * 5 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
     plot = 0
     group = 0
     while True:
@@ -375,19 +375,19 @@ def dataUpdater():
                         maxRow = cidx
                         group += 1
                     
-                    if(group == 3):
+                    if(group == 5):
                         group = 0
                         plot = 1
                         CPUIdle1 = CPUIdle
-                        CPUIdle = [0] * 3 #
+                        CPUIdle = [0] * 5 #
                         cacheDataMiss1 = cacheDataMiss
-                        cacheDataMiss = [0] * 3 #
+                        cacheDataMiss = [0] * 5 #
                         cacheDataHit1 = cacheDataHit
-                        cacheDataHit = [0] * 3 #
+                        cacheDataHit = [0] * 5 #
                         cacheDataWB1 = cacheDataWB
-                        cacheDataWB =[0] * 3 #
+                        cacheDataWB =[0] * 5 #
                         counter1 = counter
-                        counter = [0] * 3 #
+                        counter = [0] * 5 #
 
                     cacheDataMiss[group] += (int(float(splitMsg[3])))
                     cacheDataHit[group] += (int(float(splitMsg[4])))
@@ -409,8 +409,8 @@ def bufferUpdater():
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
-            for e in range(len(ThreadLevel)):
-                total += np.sum(ThreadLevel[e])
+           # for e in range(len(ThreadLevel)):
+            #    total += np.sum(ThreadLevel[e])
         time.sleep(0.9)
 
 def plotterUpdater():
@@ -544,22 +544,22 @@ def plotterUpdater():
             #finalWB = int(cacheDataWB1/CoreCount)            
 
             dataBar = dict()
-            dataBar['x'] = bar_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0] + (CoreCount-counter1[0])*210000000)/idle_divider] + [(CPUIdle1[1] + (CoreCount-counter1[1])*210000000)/idle_divider] + [(CPUIdle1[2] + (CoreCount-counter1[2])*210000000)/idle_divider]
+            dataBar['x'] = bar_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0] + (CoreCount-counter1[0])*210000000)/idle_divider] + [(CPUIdle1[1] + (CoreCount-counter1[1])*210000000)/idle_divider] + [(CPUIdle1[2] + (CoreCount-counter1[2])*210000000)/idle_divider] + [(CPUIdle1[3] + (CoreCount-counter1[3])*210000000)/idle_divider] + [(CPUIdle1[4] + (CoreCount-counter1[4])*210000000)/idle_divider]
             bar_ds.data = dataBar
             
             dataMiss = dict()
-            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
             dataMiss['y'] = Miss_line_ds.data['y'] + [cacheDataMiss1[0]/CoreCount] + [cacheDataMiss1[1]/CoreCount] + [cacheDataMiss1[2]/CoreCount]
             Miss_line_ds.data = dataMiss
 
             dataHit = dict()
-            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
             dataHit['y'] = Hit_line_ds.data['y'] + [cacheDataHit1[0]/CoreCount] + [cacheDataHit1[1]/CoreCount] + [cacheDataHit1[2]/CoreCount]
             Hit_line_ds.data = dataHit
 
             dataWB = dict()
-            dataWB['x'] = WB_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataWB['x'] = WB_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
             dataWB['y'] = WB_line_ds.data['y'] + [cacheDataWB1[0]/CoreCount] + [cacheDataWB1[1]/CoreCount] + [cacheDataWB1[2]/CoreCount]
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
