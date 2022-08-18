@@ -550,17 +550,17 @@ def plotterUpdater():
             
             dataMiss = dict()
             dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataMiss['y'] = Miss_line_ds.data['y'] + [cacheDataMiss1[0]/CoreCount] + [cacheDataMiss1[1]/CoreCount] + [cacheDataMiss1[2]/CoreCount]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [cacheDataMiss1[0]/CoreCount] + [cacheDataMiss1[1]/CoreCount] + [cacheDataMiss1[2]/CoreCount]  + [cacheDataMiss1[3]/CoreCount] + [cacheDataMiss1[4]/CoreCount]
             Miss_line_ds.data = dataMiss
 
             dataHit = dict()
             dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataHit['y'] = Hit_line_ds.data['y'] + [cacheDataHit1[0]/CoreCount] + [cacheDataHit1[1]/CoreCount] + [cacheDataHit1[2]/CoreCount]
+            dataHit['y'] = Hit_line_ds.data['y'] + [cacheDataHit1[0]/CoreCount] + [cacheDataHit1[1]/CoreCount] + [cacheDataHit1[2]/CoreCount] + [cacheDataHit1[3]/CoreCount] + [cacheDataHit1[4]/CoreCount]
             Hit_line_ds.data = dataHit
 
             dataWB = dict()
             dataWB['x'] = WB_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataWB['y'] = WB_line_ds.data['y'] + [cacheDataWB1[0]/CoreCount] + [cacheDataWB1[1]/CoreCount] + [cacheDataWB1[2]/CoreCount]
+            dataWB['y'] = WB_line_ds.data['y'] + [cacheDataWB1[0]/CoreCount] + [cacheDataWB1[1]/CoreCount] + [cacheDataWB1[2]/CoreCount] + [cacheDataWB1[3]/CoreCount] + [cacheDataWB1[4]/CoreCount]
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
 
