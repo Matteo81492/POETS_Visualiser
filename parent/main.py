@@ -403,8 +403,8 @@ def bufferUpdater():
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
-            for e in range(len(ThreadLevel)):
-                total += np.sum(ThreadLevel[e])
+            #for e in range(len(ThreadLevel)):
+             #   total += np.sum(ThreadLevel[e])
         time.sleep(0.9)
 
 def plotterUpdater():
@@ -421,7 +421,6 @@ def plotterUpdater():
                     'Execution Time'   : [execution_time, execution_time2],
                     'Average Utilisation' : [usage, usage2]}
             table_ds.data = newTable
-            select_ds.data = dataWB
 
             #######REFRESHING
             heatmap.renderers = []
@@ -556,6 +555,8 @@ def plotterUpdater():
             dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
             dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
             WB_line_ds.data = dataWB
+            select_ds.data = dataWB
+
 
     else:
         print(" blocking callback function ")
