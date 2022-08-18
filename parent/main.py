@@ -524,36 +524,37 @@ def plotterUpdater():
         liveLine_ds.data = new_data_liveLine
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
-
-        if(plot) and not (finished):
-            plot = 0
-            finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
-            finalMiss = int(cacheDataMiss1/CoreCount)
-            finalHit = int(cacheDataHit1/CoreCount)
-            finalWB = int(cacheDataWB1/CoreCount)            
-
-            dataBar = dict()
-            dataBar['x'] = bar_ds.data['x'] + [maxRow]
-            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
-            bar_ds.data = dataBar
-            
-            dataMiss = dict()
-            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
-            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
-            Miss_line_ds.data = dataMiss
-
-            dataHit = dict()
-            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
-            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
-            Hit_line_ds.data = dataHit
-
-            dataWB = dict()
-            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
-            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
-            WB_line_ds.data = dataWB
-
     else:
         print(" blocking callback function ")
+
+    if(plot) and not (finished):
+        plot = 0
+        finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
+        finalMiss = int(cacheDataMiss1/CoreCount)
+        finalHit = int(cacheDataHit1/CoreCount)
+        finalWB = int(cacheDataWB1/CoreCount)            
+
+        dataBar = dict()
+        dataBar['x'] = bar_ds.data['x'] + [maxRow]
+        dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+        bar_ds.data = dataBar
+        
+        dataMiss = dict()
+        dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
+        dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+        Miss_line_ds.data = dataMiss
+
+        dataHit = dict()
+        dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
+        dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+        Hit_line_ds.data = dataHit
+
+        dataWB = dict()
+        dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
+        dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+        WB_line_ds.data = dataWB
+
+
 
     
 if sys.version_info[0] < 3:
