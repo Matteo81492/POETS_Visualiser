@@ -231,6 +231,7 @@ gap1 = 16
 gap2 = 0
 range_tool_active = 0
 idle_divider = CoreCount*2100000
+clear = 0
 
 
 def signal_handler(*args, **kwargs):
@@ -337,7 +338,7 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1
+    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1, clear
     idx = 0
     counter1 = 0
     cacheDataMiss1 = 0
@@ -354,11 +355,12 @@ def dataUpdater():
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
             msg = data.decode("utf-8")
-            if(entered == 0):
+            if(clear):
                 line.renderers = []
                 bar.renderers = []
                 select.renderers = []
                 maxRow = 0
+                clear = 0
 
             entered = 1
             splitMsg = msg.split(API_DELIMINATOR)
@@ -406,156 +408,157 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global finished, cacheDataMiss, cacheDataHit, cacheDataWB, CPUIdle, maxRow, execution_time, usage, range_tool_active, current_data, plot
+    global finished, execution_time, usage, range_tool_active, current_data, plot, total, clear
 
-    
-    if(finished) and (mainQueue.empty()):
-        print(" RENDERING OTHER GRAPHS ")
-        execution_time2 = execution_time
-        usage2 = usage
-        execution_time = maxRow + 1
-        usage = round(total/execution_time, 3)
-        newTable = {'Application' : table_ds.data['Application'],
-                'Execution Time'   : [execution_time, execution_time2],
-                'Average Utilisation' : [usage, usage2]}
-        table_ds.data = newTable
-        select_ds.data = dataWB
+    if not(block):    
+        if(finished) and (mainQueue.empty()):
+            print(" RENDERING OTHER GRAPHS ")
+            execution_time2 = execution_time
+            usage2 = usage
+            execution_time = maxRow + 1
+            usage = round(total/execution_time, 3)
+            newTable = {'Application' : table_ds.data['Application'],
+                    'Execution Time'   : [execution_time, execution_time2],
+                    'Average Utilisation' : [usage, usage2]}
+            table_ds.data = newTable
+            select_ds.data = dataWB
 
-        #######REFRESHING
-        heatmap.renderers = []
-        liveLine.renderers = []
-        empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-        mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
-        range_tool = RangeTool(x_range = line.x_range)
-        range_tool.overlay.fill_color = "navy"
-        range_tool.overlay.fill_alpha = 0.2
-        if(range_tool_active == 0):
-            select.add_tools(range_tool)
-            select.toolbar.active_multi = range_tool
-            range_tool_active = 1
-        finished = 0
+            #######REFRESHING
+            heatmap.renderers = []
+            liveLine.renderers = []
+            empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+            mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
+            range_tool = RangeTool(x_range = line.x_range)
+            range_tool.overlay.fill_color = "navy"
+            range_tool.overlay.fill_alpha = 0.2
+            if(range_tool_active == 0):
+                select.add_tools(range_tool)
+                select.toolbar.active_multi = range_tool
+                range_tool_active = 1
+            finished = 0
+            clear = 1
+            total = 0
 
-    if not (block) and not (mainQueue.empty()):
-        
-        current_data = mainQueue.get()
-        print(mainQueue.qsize())
-
-        if(gap1 == 16):                     ## CORE VIEW
-            selected_count_x = core_count_x
-            selected_count_y = core_count_y
-            HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
-
-
-        elif(gap1 == 64):                   ## MAILBOX VIEW
-            selected_count_x = mailbox_count_x
-            selected_count_y = mailbox_count_y
-            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
-
-        elif(gap1 == 1024):                 ## BOARD VIEW
-            selected_count_x = board_count_x
-            selected_count_y = board_count_y
-            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
-
-        else:                               ## BOX VIEW
-            selected_count_x = box_count_x
-            selected_count_y = box_count_y
-            HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
-
-        if(gap2 == 0):                     ## CORE VIEW 
-            if(gap1 == 16):
-                LineLevel = HeatmapLevel
-            else:
-                LineLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
-        
-        elif(gap2 == 2):                     ## MAILBOX VIEW 
-            if(gap1 == 64):
-                LineLevel = HeatmapLevel
-            elif(gap1 == 16):
-                LineLevel = [sum(HeatmapLevel[j:j+4])//4 for j in range(0, int(len_mailbox/16) ,4)]
-            else:
-                LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
-
-        elif(gap2 == 1):                   ## THREAD VIEW
-            LineLevel = ThreadLevel
-
-        elif(gap2 == 3):                     ## BOARD VIEW 
-            if(gap1 == 1024):
-                LineLevel = HeatmapLevel
-            elif(gap1 == 16):
-                LineLevel = [sum(HeatmapLevel[j:j+64])//64 for j in range(0, int(len_board/16) ,64)]
-            elif(gap1 == 64):
-                LineLevel = [sum(HeatmapLevel[j:j+16])//16 for j in range(0, int(len_board/64) ,16)]
-            else:
-                LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
-        
-        else:
-            if(gap1 == 6144):
-                LineLevel = HeatmapLevel
-            elif(gap1 == 16):
-                LineLevel = [sum(HeatmapLevel[j:j+384])//384 for j in range(0, int(len_box/16) ,384)]
-            elif(gap1 == 64):
-                LineLevel = [sum(HeatmapLevel[j:j+96])//96 for j in range(0, int(len_box/64) ,96)]
-            elif(gap1 == 1024):
-                LineLevel = [sum(HeatmapLevel[j:j+6])//6 for j in range(0, int(len_box/1024) ,6)]
-            else:
-                LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
-
-
-
-        heatmap_data = {'x' : selected_count_x,
-            'y' : selected_count_y,
-            'intensity': HeatmapLevel}      # was ThreadLevel
-        #create a ColumnDataSource by passing the dict
-
-        heat_source = ColumnDataSource(data=heatmap_data)
+        if not (mainQueue.empty()):
             
-        latest = ContainerX[0][-1] + step
-        for i in range(len(ContainerY)):
-            ContainerY[i].append(LineLevel[i])
-            ContainerY[i].pop(0)        # All values change equally
+            current_data = mainQueue.get()
+            print(mainQueue.qsize())
 
-        ContainerX[0].append(latest)
-        ContainerX[0].pop(0)        # All values change equally
+            if(gap1 == 16):                     ## CORE VIEW
+                selected_count_x = core_count_x
+                selected_count_y = core_count_y
+                HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
 
-        new_data_liveLine = {'xs' : ContainerX,
-            'ys' : ContainerY,
-            'line_color' : line_colours}
 
-        liveLine_ds.data = new_data_liveLine
-        mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
-        heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
+            elif(gap1 == 64):                   ## MAILBOX VIEW
+                selected_count_x = mailbox_count_x
+                selected_count_y = mailbox_count_y
+                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
+
+            elif(gap1 == 1024):                 ## BOARD VIEW
+                selected_count_x = board_count_x
+                selected_count_y = board_count_y
+                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
+
+            else:                               ## BOX VIEW
+                selected_count_x = box_count_x
+                selected_count_y = box_count_y
+                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
+
+            if(gap2 == 0):                     ## CORE VIEW 
+                if(gap1 == 16):
+                    LineLevel = HeatmapLevel
+                else:
+                    LineLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
+            
+            elif(gap2 == 2):                     ## MAILBOX VIEW 
+                if(gap1 == 64):
+                    LineLevel = HeatmapLevel
+                elif(gap1 == 16):
+                    LineLevel = [sum(HeatmapLevel[j:j+4])//4 for j in range(0, int(len_mailbox/16) ,4)]
+                else:
+                    LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
+
+            elif(gap2 == 1):                   ## THREAD VIEW
+                LineLevel = ThreadLevel
+
+            elif(gap2 == 3):                     ## BOARD VIEW 
+                if(gap1 == 1024):
+                    LineLevel = HeatmapLevel
+                elif(gap1 == 16):
+                    LineLevel = [sum(HeatmapLevel[j:j+64])//64 for j in range(0, int(len_board/16) ,64)]
+                elif(gap1 == 64):
+                    LineLevel = [sum(HeatmapLevel[j:j+16])//16 for j in range(0, int(len_board/64) ,16)]
+                else:
+                    LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
+            
+            else:
+                if(gap1 == 6144):
+                    LineLevel = HeatmapLevel
+                elif(gap1 == 16):
+                    LineLevel = [sum(HeatmapLevel[j:j+384])//384 for j in range(0, int(len_box/16) ,384)]
+                elif(gap1 == 64):
+                    LineLevel = [sum(HeatmapLevel[j:j+96])//96 for j in range(0, int(len_box/64) ,96)]
+                elif(gap1 == 1024):
+                    LineLevel = [sum(HeatmapLevel[j:j+6])//6 for j in range(0, int(len_box/1024) ,6)]
+                else:
+                    LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
+
+
+
+            heatmap_data = {'x' : selected_count_x,
+                'y' : selected_count_y,
+                'intensity': HeatmapLevel}      # was ThreadLevel
+            #create a ColumnDataSource by passing the dict
+
+            heat_source = ColumnDataSource(data=heatmap_data)
+                
+            latest = ContainerX[0][-1] + step
+            for i in range(len(ContainerY)):
+                ContainerY[i].append(LineLevel[i])
+                ContainerY[i].pop(0)        # All values change equally
+
+            ContainerX[0].append(latest)
+            ContainerX[0].pop(0)        # All values change equally
+
+            new_data_liveLine = {'xs' : ContainerX,
+                'ys' : ContainerY,
+                'line_color' : line_colours}
+
+            liveLine_ds.data = new_data_liveLine
+            mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
+            heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
+
+
+        if(plot) and not (finished):
+            plot = 0
+            finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
+            finalMiss = int(cacheDataMiss1/CoreCount)
+            finalHit = int(cacheDataHit1/CoreCount)
+            finalWB = int(cacheDataWB1/CoreCount)            
+
+            dataBar = dict()
+            dataBar['x'] = bar_ds.data['x'] + [maxRow]
+            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+            bar_ds.data = dataBar
+            
+            dataMiss = dict()
+            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+            Miss_line_ds.data = dataMiss
+
+            dataHit = dict()
+            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
+            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+            Hit_line_ds.data = dataHit
+
+            dataWB = dict()
+            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
+            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+            WB_line_ds.data = dataWB
+
     else:
         print(" blocking callback function ")
-
-    if(plot) and not (finished):
-        plot = 0
-        finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
-        finalMiss = int(cacheDataMiss1/CoreCount)
-        finalHit = int(cacheDataHit1/CoreCount)
-        finalWB = int(cacheDataWB1/CoreCount)            
-
-        dataBar = dict()
-        dataBar['x'] = bar_ds.data['x'] + [maxRow]
-        dataBar['top'] = bar_ds.data['top'] + [finalIdle]
-        bar_ds.data = dataBar
-        
-        dataMiss = dict()
-        dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
-        dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
-        Miss_line_ds.data = dataMiss
-
-        dataHit = dict()
-        dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
-        dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
-        Hit_line_ds.data = dataHit
-
-        dataWB = dict()
-        dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
-        dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
-        WB_line_ds.data = dataWB
-
-
-
     
 if sys.version_info[0] < 3:
     print("ERROR: Visualiser must be executed using Python 3")
