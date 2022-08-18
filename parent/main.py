@@ -345,12 +345,13 @@ def dataUpdater():
     cacheDataHit1 = 0
     cacheDataWB1 = 0
     CPUIdle1 = 0
-    counter2 = 0
-    cacheDataMiss2 = 0
-    cacheDataHit2 = 0
-    cacheDataWB2 = 0
-    CPUIdle2 = 0
+    counter =  [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    cacheDataMiss = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    cacheDataHit = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16) 
+    cacheDataWB = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
+    CPUIdle = [0] * 3 #np.ndarray(3, buffer=np.zeros(3), dtype=np.uint16)
     plot = 0
+    group = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
@@ -372,22 +373,27 @@ def dataUpdater():
                 if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
                     if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
                         maxRow = cidx
+                        group += 1
+                    
+                    if(group == 3):
+                        group = 0
                         plot = 1
-                        CPUIdle1 = CPUIdle2
-                        CPUIdle2 = 0
-                        cacheDataMiss1 = cacheDataMiss2
-                        cacheDataMiss2 = 0
-                        cacheDataHit1 = cacheDataHit2
-                        cacheDataHit2 = 0
-                        cacheDataWB1 = cacheDataWB2
-                        cacheDataWB2 = 0
-                        counter1 = counter2
-                        counter2 = 0
-                    cacheDataMiss2 += (int(float(splitMsg[3])))
-                    cacheDataHit2 += (int(float(splitMsg[4])))
-                    cacheDataWB2 += (int(float(splitMsg[5])))
-                    CPUIdle2 += (int(float(splitMsg[6])))
-                    counter2 += 1
+                        CPUIdle1 = CPUIdle
+                        CPUIdle = [0] * 3 #
+                        cacheDataMiss1 = cacheDataMiss
+                        cacheDataMiss = [0] * 3 #
+                        cacheDataHit1 = cacheDataHit
+                        cacheDataHit = [0] * 3 #
+                        cacheDataWB1 = cacheDataWB
+                        cacheDataWB =[0] * 3 #
+                        counter1 = counter
+                        counter = [0] * 3 #
+
+                    cacheDataMiss[group] += (int(float(splitMsg[3])))
+                    cacheDataHit[group] += (int(float(splitMsg[4])))
+                    cacheDataWB[group] += (int(float(splitMsg[5])))
+                    CPUIdle[group] += (int(float(splitMsg[6])))
+                    counter[group] += 1
             else:
                 print("idx range is out of bound")
         except socket.timeout:
@@ -403,8 +409,8 @@ def bufferUpdater():
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
-            #for e in range(len(ThreadLevel)):
-             #   total += np.sum(ThreadLevel[e])
+            for e in range(len(ThreadLevel)):
+                total += np.sum(ThreadLevel[e])
         time.sleep(0.9)
 
 def plotterUpdater():
@@ -528,32 +534,33 @@ def plotterUpdater():
             mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
             heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
+#########TRY WITHOUT INT AND np
 
         if(plot) and not (finished):
             plot = 0
-            finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
-            finalMiss = int(cacheDataMiss1/CoreCount)
-            finalHit = int(cacheDataHit1/CoreCount)
-            finalWB = int(cacheDataWB1/CoreCount)            
+            #finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
+            #finalMiss = int(cacheDataMiss1/CoreCount)
+            #finalHit = int(cacheDataHit1/CoreCount)
+            #finalWB = int(cacheDataWB1/CoreCount)            
 
             dataBar = dict()
-            dataBar['x'] = bar_ds.data['x'] + [maxRow]
-            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+            dataBar['x'] = bar_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0] + (CoreCount-counter1[0])*210000000)/idle_divider] + [(CPUIdle1[1] + (CoreCount-counter1[1])*210000000)/idle_divider] + [(CPUIdle1[2] + (CoreCount-counter1[2])*210000000)/idle_divider]
             bar_ds.data = dataBar
             
             dataMiss = dict()
-            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
-            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [cacheDataMiss1[0]/CoreCount] + [cacheDataMiss1[1]/CoreCount] + [cacheDataMiss1[2]/CoreCount]
             Miss_line_ds.data = dataMiss
 
             dataHit = dict()
-            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
-            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataHit['y'] = Hit_line_ds.data['y'] + [cacheDataHit1[0]/CoreCount] + [cacheDataHit1[1]/CoreCount] + [cacheDataHit1[2]/CoreCount]
             Hit_line_ds.data = dataHit
 
             dataWB = dict()
-            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
-            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+            dataWB['x'] = WB_line_ds.data['x'] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataWB['y'] = WB_line_ds.data['y'] + [cacheDataWB1[0]/CoreCount] + [cacheDataWB1[1]/CoreCount] + [cacheDataWB1[2]/CoreCount]
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
 
