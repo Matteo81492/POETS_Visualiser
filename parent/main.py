@@ -38,7 +38,7 @@ mainQueue = Queue()
 
 # POETS Configurations
 ############################################################################
-refresh_rate = 890 ## Time in millisecond for updating live plots
+refresh_rate = 1000 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
@@ -230,6 +230,7 @@ block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
 gap2 = 0
 range_tool_active = 0
+idle_divider = CoreCount*2100000
 
 
 def signal_handler(*args, **kwargs):
@@ -353,6 +354,12 @@ def dataUpdater():
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
             msg = data.decode("utf-8")
+            if(entered == 0):
+                line.renderers = []
+                bar.renderers = []
+                select.renderers = []
+                maxRow = 0
+
             entered = 1
             splitMsg = msg.split(API_DELIMINATOR)
             idx = int(float(splitMsg[0]))
@@ -372,7 +379,7 @@ def dataUpdater():
                         cacheDataHit2 = 0
                         cacheDataWB1 = cacheDataWB2
                         cacheDataWB2 = 0
-                        counter1 = CoreCount - counter2
+                        counter1 = counter2
                         counter2 = 0
                     cacheDataMiss2 += (int(float(splitMsg[3])))
                     cacheDataHit2 += (int(float(splitMsg[4])))
@@ -412,6 +419,7 @@ def plotterUpdater():
                 'Execution Time'   : [execution_time, execution_time2],
                 'Average Utilisation' : [usage, usage2]}
         table_ds.data = newTable
+        select_ds.data = dataWB
 
         #######REFRESHING
         heatmap.renderers = []
@@ -517,34 +525,32 @@ def plotterUpdater():
         mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
         heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
-    if(plot) and not (finished):
-        plot = 0
-        finalIdle = int((CPUIdle1 + (counter1*210000000))/(CoreCount*2100000))
-        finalMiss = int(cacheDataMiss1/CoreCount)
-        finalHit = int(cacheDataHit1/CoreCount)
-        finalWB = int(cacheDataWB1/CoreCount)            
+        if(plot) and not (finished):
+            plot = 0
+            finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider)
+            finalMiss = int(cacheDataMiss1/CoreCount)
+            finalHit = int(cacheDataHit1/CoreCount)
+            finalWB = int(cacheDataWB1/CoreCount)            
 
-        dataBar = dict()
-        dataBar['x'] = bar_ds.data['x'] + [maxRow]
-        dataBar['top'] = bar_ds.data['top'] + [finalIdle]
-        bar_ds.data = dataBar
-        
-        dataMiss = dict()
-        dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
-        dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
-        Miss_line_ds.data = dataMiss
+            dataBar = dict()
+            dataBar['x'] = bar_ds.data['x'] + [maxRow]
+            dataBar['top'] = bar_ds.data['top'] + [finalIdle]
+            bar_ds.data = dataBar
+            
+            dataMiss = dict()
+            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [finalMiss]
+            Miss_line_ds.data = dataMiss
 
-        dataHit = dict()
-        dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
-        dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
-        Hit_line_ds.data = dataHit
+            dataHit = dict()
+            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow]
+            dataHit['y'] = Hit_line_ds.data['y'] + [finalHit]
+            Hit_line_ds.data = dataHit
 
-        dataWB = dict()
-        dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
-        dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
-        WB_line_ds.data = dataWB
-
-        select_ds.data = dataWB
+            dataWB = dict()
+            dataWB['x'] = WB_line_ds.data['x'] + [maxRow]
+            dataWB['y'] = WB_line_ds.data['y'] + [finalWB]
+            WB_line_ds.data = dataWB
 
     else:
         print(" blocking callback function ")
