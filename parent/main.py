@@ -339,20 +339,21 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1, clear
+    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1, clear, biggest
     idx = 0
     counter1 = 0
     cacheDataMiss1 = 0
     cacheDataHit1 = 0
     cacheDataWB1 = 0
     CPUIdle1 = 0
-    counter =  np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-    cacheDataMiss = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-    cacheDataHit = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16) 
-    cacheDataWB = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-    CPUIdle = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint32)
+    counter = [0] * 5
+    cacheDataMiss = [0] * 5
+    cacheDataHit = [0] * 5 
+    cacheDataWB = [0] * 5
+    CPUIdle = [0] * 5
     plot = 0
     group = 0
+    biggest = 0
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
@@ -367,6 +368,8 @@ def dataUpdater():
             entered = 1
             splitMsg = msg.split(API_DELIMINATOR)
             idx = int(float(splitMsg[0]))
+            if(idx > biggest):
+                biggest = idx
             cidx = int(float(splitMsg[1]))
             if idx < ThreadCount and idx >= 0:
                 ThreadLevel[idx] = int(float(splitMsg[7]))                   
@@ -380,15 +383,15 @@ def dataUpdater():
                         group = 0
                         plot = 1
                         CPUIdle1 = CPUIdle
-                        CPUIdle = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-                        cacheDataMiss1 = cacheDataMiss + 0
-                        cacheDataMiss = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-                        cacheDataHit1 = cacheDataHit + 0
-                        cacheDataHit = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-                        cacheDataWB1 = cacheDataWB + 0
-                        cacheDataWB = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
-                        counter1 = counter + 0
-                        counter = np.ndarray(5, buffer=np.zeros(5), dtype=np.uint16)
+                        CPUIdle = [0] * 5
+                        cacheDataMiss1 = cacheDataMiss 
+                        cacheDataMiss = [0] * 5
+                        cacheDataHit1 = cacheDataHit
+                        cacheDataHit = [0] * 5
+                        cacheDataWB1 = cacheDataWB 
+                        cacheDataWB = [0] * 5
+                        counter1 = counter 
+                        counter = [0] * 5
 
                     cacheDataMiss[group] += (int(float(splitMsg[3])))
                     cacheDataHit[group] += (int(float(splitMsg[4])))
@@ -410,8 +413,8 @@ def bufferUpdater():
     while True:
         if(entered) and not ((ThreadLevel==current_data).all()):
             mainQueue.put(ThreadLevel, False)
-           # for e in range(len(ThreadLevel)):
-            #    total += np.sum(ThreadLevel[e])
+            for e in range(biggest+1):
+                total += np.sum(ThreadLevel[e])
         time.sleep(0.9)
 
 def plotterUpdater():
@@ -453,7 +456,7 @@ def plotterUpdater():
             if(gap1 == 16):                     ## CORE VIEW
                 selected_count_x = core_count_x
                 selected_count_y = core_count_y
-                HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
+                HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest ,n)]
 
 
             elif(gap1 == 64):                   ## MAILBOX VIEW
@@ -475,7 +478,7 @@ def plotterUpdater():
                 if(gap1 == 16):
                     LineLevel = HeatmapLevel
                 else:
-                    LineLevel = [sum(current_data[j:j+n])//n for j in range(0, len_core ,n)]
+                    LineLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest ,n)]
             
             elif(gap2 == 2):                     ## MAILBOX VIEW 
                 if(gap1 == 64):
@@ -514,15 +517,13 @@ def plotterUpdater():
 
             heatmap_data = {'x' : selected_count_x,
                 'y' : selected_count_y,
-                'intensity': HeatmapLevel}      # was ThreadLevel
+                'intensity': HeatmapLevel + [0] * (len(selected_count_x) - len(HeatmapLevel))}      # was ThreadLevel
             #create a ColumnDataSource by passing the dict
 
             heat_source = ColumnDataSource(data=heatmap_data)
-                
+
             latest = ContainerX[0][-1] + step
-            for i in range(len(ContainerY)):
-                #point = LineLevel[i]
-                #if (point):
+            for i in range(int(biggest/16)):
                 ContainerY[i].append(LineLevel[i])
                 ContainerY[i].pop(0)        # All values change equally
 
@@ -531,7 +532,7 @@ def plotterUpdater():
 
             new_data_liveLine = {'xs' : ContainerX,
                 'ys' : ContainerY,
-                'line_color' : line_colours}
+                'line_color' : line_colours }
 
             liveLine_ds.data = new_data_liveLine
             mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
@@ -548,22 +549,22 @@ def plotterUpdater():
 
             dataBar = dict()
             dataBar['x'] = bar_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataBar['top'] = bar_ds.data['top'] + [int(CPUIdle1[0]/idle_divider1 + (CoreCount-counter1[0])/idle_divider2)] + [int(CPUIdle1[1]/idle_divider1 + (CoreCount-counter1[1])/idle_divider2)] + [int(CPUIdle1[2]/idle_divider1 + (CoreCount-counter1[2])/idle_divider2)] + [int(CPUIdle1[3]/idle_divider1 + (CoreCount-counter1[3])/idle_divider2)] + [int(CPUIdle1[4]/idle_divider1 + (CoreCount-counter1[4])/idle_divider2)]
+            dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0]/idle_divider1 + (CoreCount-counter1[0])/idle_divider2)] + [(CPUIdle1[1]/idle_divider1 + (CoreCount-counter1[1])/idle_divider2)] + [(CPUIdle1[2]/idle_divider1 + (CoreCount-counter1[2])/idle_divider2)] + [(CPUIdle1[3]/idle_divider1 + (CoreCount-counter1[3])/idle_divider2)] + [(CPUIdle1[4]/idle_divider1 + (CoreCount-counter1[4])/idle_divider2)]
             bar_ds.data = dataBar
             
             dataMiss = dict()
             dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataMiss['y'] = Miss_line_ds.data['y'] + [int(cacheDataMiss1[0]/CoreCount)] + [int(cacheDataMiss1[1]/CoreCount)] + [int(cacheDataMiss1[2]/CoreCount)]  + [int(cacheDataMiss1[3]/CoreCount)] + [int(cacheDataMiss1[4]/CoreCount)]
+            dataMiss['y'] = Miss_line_ds.data['y'] + [(cacheDataMiss1[0]/CoreCount)] + [(cacheDataMiss1[1]/CoreCount)] + [(cacheDataMiss1[2]/CoreCount)]  + [(cacheDataMiss1[3]/CoreCount)] + [(cacheDataMiss1[4]/CoreCount)]
             Miss_line_ds.data = dataMiss
 
             dataHit = dict()
             dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataHit['y'] = Hit_line_ds.data['y'] + [int(cacheDataHit1[0]/CoreCount)] + [int(cacheDataHit1[1]/CoreCount)] + [int(cacheDataHit1[2]/CoreCount)] + [int(cacheDataHit1[3]/CoreCount)] + [int(cacheDataHit1[4]/CoreCount)]
+            dataHit['y'] = Hit_line_ds.data['y'] + [(cacheDataHit1[0]/CoreCount)] + [(cacheDataHit1[1]/CoreCount)] + [(cacheDataHit1[2]/CoreCount)] + [(cacheDataHit1[3]/CoreCount)] + [(cacheDataHit1[4]/CoreCount)]
             Hit_line_ds.data = dataHit
 
             dataWB = dict()
             dataWB['x'] = WB_line_ds.data['x'] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
-            dataWB['y'] = WB_line_ds.data['y'] + [int(cacheDataWB1[0]/CoreCount)] + [int(cacheDataWB1[1]/CoreCount)] + [int(cacheDataWB1[2]/CoreCount)] + [int(cacheDataWB1[3]/CoreCount)] + [int(cacheDataWB1[4]/CoreCount)]
+            dataWB['y'] = WB_line_ds.data['y'] + [(cacheDataWB1[0]/CoreCount)] + [(cacheDataWB1[1]/CoreCount)] + [(cacheDataWB1[2]/CoreCount)] + [(cacheDataWB1[3]/CoreCount)] + [(cacheDataWB1[4]/CoreCount)]
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
 
