@@ -346,12 +346,11 @@ def dataUpdater():
     cacheDataHit1 = 0
     cacheDataWB1 = 0
     CPUIdle1 = 0
-    empty2 = [0] * 10
-    counter = empty2
-    cacheDataMiss = empty2
-    cacheDataHit = empty2
-    cacheDataWB = empty2
-    CPUIdle = empty2
+    counter = [0] * 10 
+    cacheDataMiss = [0] * 10
+    cacheDataHit = [0] * 10
+    cacheDataWB = [0] * 10
+    CPUIdle = [0] * 10
     plot = 0
     group = 0
     biggest = 0
@@ -383,16 +382,16 @@ def dataUpdater():
                     if(group == 10):
                         group = 0
                         plot = 1
-                        CPUIdle1 = CPUIdle
-                        CPUIdle = empty2
-                        cacheDataMiss1 = cacheDataMiss 
-                        cacheDataMiss = empty2
-                        cacheDataHit1 = cacheDataHit
-                        cacheDataHit = empty2
-                        cacheDataWB1 = cacheDataWB 
-                        cacheDataWB = empty2
-                        counter1 = counter 
-                        counter = empty2
+                        CPUIdle1 = CPUIdle + []
+                        CPUIdle = [0] * 10
+                        cacheDataMiss1 = cacheDataMiss + []
+                        cacheDataMiss = [0] * 10
+                        cacheDataHit1 = cacheDataHit + []
+                        cacheDataHit = [0] * 10
+                        cacheDataWB1 = cacheDataWB + []
+                        cacheDataWB = [0] * 10
+                        counter1 = counter + []
+                        counter = [0] * 10
 
                     cacheDataMiss[group] += (int(float(splitMsg[3])))
                     cacheDataHit[group] += (int(float(splitMsg[4])))
