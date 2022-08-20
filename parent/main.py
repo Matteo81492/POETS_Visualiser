@@ -233,6 +233,7 @@ range_tool_active = 0
 idle_divider1 = CoreCount*2100000
 idle_divider2 = CoreCount/100
 clear = 0
+i = 1
 
 
 def signal_handler(*args, **kwargs):
@@ -418,7 +419,7 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global finished, execution_time, usage, range_tool_active, current_data, plot, total, clear
+    global finished, execution_time, usage, range_tool_active, current_data, plot, total, clear, i
 
     if not(block):    
         if(finished) and (mainQueue.empty()):
@@ -548,26 +549,27 @@ def plotterUpdater():
             #finalWB = int(cacheDataWB1/CoreCount)            
 
             dataBar = dict()
-            dataBar['x'] = bar_ds.data['x'] + [maxRow-10] + [maxRow-9] + [maxRow-8] + [maxRow-7] + [maxRow-6] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataBar['x'] = bar_ds.data['x'] + [i] + [i+1] + [i+2] + [i+3] + [i+4] + [i+5] + [i+6] + [i+7] + [i+8] + [i+9]
             dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0]/idle_divider1 + (CoreCount-counter1[0])/idle_divider2)] + [(CPUIdle1[1]/idle_divider1 + (CoreCount-counter1[1])/idle_divider2)] + [(CPUIdle1[2]/idle_divider1 + (CoreCount-counter1[2])/idle_divider2)] + [(CPUIdle1[3]/idle_divider1 + (CoreCount-counter1[3])/idle_divider2)] + [(CPUIdle1[4]/idle_divider1 + (CoreCount-counter1[4])/idle_divider2)] + [(CPUIdle1[5]/idle_divider1 + (CoreCount-counter1[5])/idle_divider2)] + [(CPUIdle1[6]/idle_divider1 + (CoreCount-counter1[6])/idle_divider2)] + [(CPUIdle1[7]/idle_divider1 + (CoreCount-counter1[7])/idle_divider2)] + [(CPUIdle1[8]/idle_divider1 + (CoreCount-counter1[8])/idle_divider2)] + [(CPUIdle1[9]/idle_divider1 + (CoreCount-counter1[9])/idle_divider2)]
             bar_ds.data = dataBar
             
             dataMiss = dict()
-            dataMiss['x'] = Miss_line_ds.data['x'] + [maxRow-10] + [maxRow-9] + [maxRow-8] + [maxRow-7] + [maxRow-6] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataMiss['x'] = Miss_line_ds.data['x'] + [i] + [i+1] + [i+2] + [i+3] + [i+4] + [i+5] + [i+6] + [i+7] + [i+8] + [i+9]
             dataMiss['y'] = Miss_line_ds.data['y'] + [(cacheDataMiss1[0]/CoreCount)] + [(cacheDataMiss1[1]/CoreCount)] + [(cacheDataMiss1[2]/CoreCount)]  + [(cacheDataMiss1[3]/CoreCount)] + [(cacheDataMiss1[4]/CoreCount)] + [(cacheDataMiss1[5]/CoreCount)] + [(cacheDataMiss1[6]/CoreCount)] + [(cacheDataMiss1[7]/CoreCount)]  + [(cacheDataMiss1[8]/CoreCount)] + [(cacheDataMiss1[9]/CoreCount)]
             Miss_line_ds.data = dataMiss
 
             dataHit = dict()
-            dataHit['x'] = Hit_line_ds.data['x'] + [maxRow-10] + [maxRow-9] + [maxRow-8] + [maxRow-7] + [maxRow-6] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataHit['x'] = Hit_line_ds.data['x'] + [i] + [i+1] + [i+2] + [i+3] + [i+4] + [i+5] + [i+6] + [i+7] + [i+8] + [i+9]
             dataHit['y'] = Hit_line_ds.data['y'] + [(cacheDataHit1[0]/CoreCount)] + [(cacheDataHit1[1]/CoreCount)] + [(cacheDataHit1[2]/CoreCount)] + [(cacheDataHit1[3]/CoreCount)] + [(cacheDataHit1[4]/CoreCount)] + [(cacheDataHit1[5]/CoreCount)] + [(cacheDataHit1[6]/CoreCount)] + [(cacheDataHit1[7]/CoreCount)] + [(cacheDataHit1[8]/CoreCount)] + [(cacheDataHit1[9]/CoreCount)]
             Hit_line_ds.data = dataHit
 
             dataWB = dict()
-            dataWB['x'] = WB_line_ds.data['x'] + [maxRow-10] + [maxRow-9] + [maxRow-8] + [maxRow-7] + [maxRow-6] + [maxRow-5] + [maxRow-4] + [maxRow-3] + [maxRow-2] + [maxRow-1]
+            dataWB['x'] = WB_line_ds.data['x'] + [i] + [i+1] + [i+2] + [i+3] + [i+4] + [i+5] + [i+6] + [i+7] + [i+8] + [i+9]
             dataWB['y'] = WB_line_ds.data['y'] + [(cacheDataWB1[0]/CoreCount)] + [(cacheDataWB1[1]/CoreCount)] + [(cacheDataWB1[2]/CoreCount)] + [(cacheDataWB1[3]/CoreCount)] + [(cacheDataWB1[4]/CoreCount)] + [(cacheDataWB1[5]/CoreCount)] + [(cacheDataWB1[6]/CoreCount)] + [(cacheDataWB1[7]/CoreCount)] + [(cacheDataWB1[8]/CoreCount)] + [(cacheDataWB1[9]/CoreCount)]
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
 
+            i += 10
 
     else:
         print(" blocking callback function ")
