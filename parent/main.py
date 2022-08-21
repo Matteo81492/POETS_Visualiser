@@ -370,7 +370,7 @@ def dataUpdater():
     CPUIdle = [0] * 10
     plot = 0
     group = 0
-    biggest = 0
+    biggest = 1
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
@@ -610,6 +610,6 @@ curdoc().template_variables['stats_names'] = [ 'Threads', 'Cores', 'Refresh']
 curdoc().template_variables['stats'] = {
     'Threads'     : {'icon': None,          'value': 49152,  'label': 'Total Threads'},
     'Cores'       : {'icon': None,        'value': 3072,  'label': 'Total Cores'},
-    'Refresh'        : {'icon': None,        'value': refresh_rate,  'label': 'Refresh Rate'},
+    'Refresh'        : {'icon': None,        'value': refresh_rate,  'label': 'Refresh Rate (ms)'},
 }
 curdoc().add_periodic_callback(plotterUpdater, refresh_rate) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Verz
