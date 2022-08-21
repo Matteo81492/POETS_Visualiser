@@ -3,6 +3,7 @@
     and a line graph show idle and cache values respectively. The dashboard follows a Bootstrap
     template and is shown locally.
 '''
+from mailbox import Mailbox
 from multiprocessing import Queue
 import threading
 import sys
@@ -59,15 +60,13 @@ usage = 0
 
 # Plot Configurations
 ############################################################################
-row_x = [x for x in range(root_core)] #To define central square coordinates, a 0.5 offset is needed
+row_x = [x for x in range(root_core)]
 core_count_x = []
 core_count_y = []
 for i in range(root_core):
     core_count_x.extend(row_x)
     column_y = [i*2 for x in range(root_core)]
     core_count_y.extend(column_y)
-len_core = len(core_count_x) * 16
-
 
 
 row_x = [x for x in range(root_mailbox)]
@@ -77,7 +76,7 @@ for i in range(root_mailbox):
     mailbox_count_x.extend(row_x)
     column_y = [i * 2 for x in range(root_mailbox)]
     mailbox_count_y.extend(column_y)
-len_mailbox = len(mailbox_count_x) * 64
+MailboxCount = len(mailbox_count_x)
 
 
 row_x = [x for x in range(root_board)]
@@ -87,7 +86,7 @@ for i in range(root_board+2):     ## + 2 because two extra rows are needed to re
     board_count_x.extend(row_x)
     column_y = [i*2 for x in range(root_board)]
     board_count_y.extend(column_y)
-len_board = len(board_count_x) * 1024
+BoardCount = len(board_count_x)
 
 
 row_x = [x for x in range(root_box)]
@@ -97,7 +96,10 @@ for i in range(root_box+2):     ## + 2 because two extra rows are needed to reac
     box_count_x.extend(row_x)
     column_y = [i*2 for x in range(root_box)]
     box_count_y.extend(column_y)
-len_box = len(box_count_x) * 6144
+BoxCount = len(box_count_x)
+
+selected_count_x = core_count_x
+selected_count_y = core_count_y
 
 #Configurations for Heatmap - Used for TX/S values
 
@@ -114,6 +116,8 @@ heatmap = figure(width = 560, height = 600, tools=[hover, TOOLS], title="Heat Ma
 heatmap.axis.visible = False
 heatmap.grid.visible = False
 heatmap.toolbar.logo = None
+
+max_colour = 4000
 
 #Fixed heatmap color, going from light green to dark red
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
@@ -138,14 +142,14 @@ liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
 step = refresh_rate/1000 # Step for X range
-zero_list = [0] * 3
-step_list = [i * step for i in range(3)]
+zero_list = [0] * 4
+step_list = [i * step for i in range(4)]
 
 ContainerX = np.empty((CoreCount,),  dtype = object)
 ContainerY = np.empty((CoreCount,), dtype =  object)
 line_colours = []
 for i in range(len(ContainerY)): 
-    ContainerY[i]=[0,0,0]
+    ContainerY[i]=[0,0,0,0]
     ContainerX[i]=step_list 
     line_colours.append(random.choice(palette2)) #### try to eliminate random
 
@@ -228,7 +232,7 @@ table_ds = table.source
 finished = 0 # Variable used to start other graphs
 block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
-gap2 = 0
+gap2 = CoreCount
 range_tool_active = 0
 idle_divider1 = CoreCount*2100000
 idle_divider2 = CoreCount/100
@@ -249,26 +253,38 @@ def stopper():
     block = ~block
 
 def clicker_h(event):
-    global gap1
+    global gap1, selected_count_x, selected_count_y, max_colour
     print(event.item + str(" VIEW FOR LIVE HEATMAP"))
     heatmap.renderers = []
 
     if event.item == "CORE":
         gap1 = 16
+        selected_count_x = core_count_x
+        selected_count_y = core_count_y
+        max_colour = 3000
         heatmap.tools[0].tooltips = [("core", "$index"),
                                     ("TX/s", "@intensity")]
                             
     elif event.item == "MAILBOX":
         gap1 = 64
+        selected_count_x = mailbox_count_x
+        selected_count_y = mailbox_count_y
+        max_colour = 1000
         heatmap.tools[0].tooltips = [("mailbox", "$index"),
                                     ("TX/s", "@intensity")]
                                     
     elif event.item == "BOARD":
         gap1 = 1024
+        selected_count_x = board_count_x
+        selected_count_y = board_count_y
+        max_colour = 800
         heatmap.tools[0].tooltips = [("board", "$index"),
                                     ("TX/s", "@intensity")]
     else:
         gap1 = 6144
+        selected_count_x = box_count_x
+        selected_count_y = box_count_y
+        max_colour = 400
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
@@ -286,7 +302,7 @@ def clicker_l(event):
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
             line_colours.append(random.choice(palette2)) #### try to eliminate random
-        gap2 = 0
+        gap2 = CoreCount
         liveLine.tools[0].tooltips = [("core", "$index")]
 
     elif event.item == "THREAD":
@@ -297,40 +313,40 @@ def clicker_l(event):
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
             line_colours.append(random.choice(palette2)) #### try to eliminate random
-        gap2 = 1
+        gap2 = ThreadCount
         liveLine.tools[0].tooltips = [("thread", "$index")]
 
     elif event.item == "MAILBOX":
-        ContainerX = np.empty((len(mailbox_count_x,)),  dtype = object)
-        ContainerY = np.empty((len(mailbox_count_y,)), dtype =  object)
+        ContainerX = np.empty((MailboxCount,),  dtype = object)
+        ContainerY = np.empty((MailboxCount,), dtype =  object)
         line_colours = []
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
             line_colours.append(random.choice(palette2)) #### try to eliminate random
-        gap2 = 2
+        gap2 = MailboxCount
         liveLine.tools[0].tooltips = [("mailbox", "$index")]
                                     
     elif event.item == "BOARD":
-        ContainerX = np.empty((len(board_count_x,)),  dtype = object)
-        ContainerY = np.empty((len(board_count_y,)), dtype =  object)
+        ContainerX = np.empty((BoardCount,),  dtype = object)
+        ContainerY = np.empty((BoardCount,), dtype =  object)
         line_colours = []
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
             line_colours.append(random.choice(palette2)) #### try to eliminate random
-        gap2 = 3
+        gap2 = BoardCount
         liveLine.tools[0].tooltips = [("board", "$index")]
 
     else:
-        ContainerX = np.empty((len(box_count_x,)),  dtype = object)
-        ContainerY = np.empty((len(box_count_y,)), dtype =  object)
+        ContainerX = np.empty((BoxCount,),  dtype = object)
+        ContainerY = np.empty((BoxCount,), dtype =  object)
         line_colours = []
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
             line_colours.append(random.choice(palette2)) #### try to eliminate random
-        gap2 = 4
+        gap2 = BoxCount
         liveLine.tools[0].tooltips = [("box", "$index")]
 
     mainQueue.put(ThreadLevel)
@@ -445,7 +461,6 @@ def plotterUpdater():
                 select.add_tools(range_tool)
                 select.toolbar.active_multi = range_tool
                 range_tool_active = 1
-            finished = 0
             clear = 1
             total = 0
 
@@ -455,64 +470,44 @@ def plotterUpdater():
             print(mainQueue.qsize())
 
             if(gap1 == 16):                     ## CORE VIEW
-                selected_count_x = core_count_x
-                selected_count_y = core_count_y
-                HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest ,n)]
+                HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest +1 ,n)]
 
 
             elif(gap1 == 64):                   ## MAILBOX VIEW
-                selected_count_x = mailbox_count_x
-                selected_count_y = mailbox_count_y
-                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_mailbox, gap1)]
+                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, biggest + 1, gap1)]
 
             elif(gap1 == 1024):                 ## BOARD VIEW
-                selected_count_x = board_count_x
-                selected_count_y = board_count_y
-                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_board, gap1)]
+                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, biggest + 1 , gap1)]
 
             else:                               ## BOX VIEW
-                selected_count_x = box_count_x
-                selected_count_y = box_count_y
-                HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, len_box, gap1)]
+                HeatmapLevel = [sum(current_data[j:j+biggest])//gap1 for j in range(0, biggest + 1, biggest)]
 
-            if(gap2 == 0):                     ## CORE VIEW 
+            if(gap2 == CoreCount):                     ## CORE VIEW 
                 if(gap1 == 16):
                     LineLevel = HeatmapLevel
                 else:
-                    LineLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest ,n)]
+                    LineLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest + 1 ,n)]
             
-            elif(gap2 == 2):                     ## MAILBOX VIEW 
+            elif(gap2 == MailboxCount):                     ## MAILBOX VIEW 
                 if(gap1 == 64):
                     LineLevel = HeatmapLevel
-                elif(gap1 == 16):
-                    LineLevel = [sum(HeatmapLevel[j:j+4])//4 for j in range(0, int(len_mailbox/16) ,4)]
                 else:
-                    LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, int(len_mailbox) ,64)]
+                    LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, biggest + 1 ,64)]
 
-            elif(gap2 == 1):                   ## THREAD VIEW
-                LineLevel = ThreadLevel
+            elif(gap2 == ThreadCount):                   ## THREAD VIEW
+                LineLevel = ThreadLevel[0:biggest+1]
 
-            elif(gap2 == 3):                     ## BOARD VIEW 
+            elif(gap2 == BoardCount):                     ## BOARD VIEW 
                 if(gap1 == 1024):
                     LineLevel = HeatmapLevel
-                elif(gap1 == 16):
-                    LineLevel = [sum(HeatmapLevel[j:j+64])//64 for j in range(0, int(len_board/16) ,64)]
-                elif(gap1 == 64):
-                    LineLevel = [sum(HeatmapLevel[j:j+16])//16 for j in range(0, int(len_board/64) ,16)]
                 else:
-                    LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, int(len_board) ,1024)]
+                    LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, biggest + 1 ,1024)]
             
             else:
                 if(gap1 == 6144):
                     LineLevel = HeatmapLevel
-                elif(gap1 == 16):
-                    LineLevel = [sum(HeatmapLevel[j:j+384])//384 for j in range(0, int(len_box/16) ,384)]
-                elif(gap1 == 64):
-                    LineLevel = [sum(HeatmapLevel[j:j+96])//96 for j in range(0, int(len_box/64) ,96)]
-                elif(gap1 == 1024):
-                    LineLevel = [sum(HeatmapLevel[j:j+6])//6 for j in range(0, int(len_box/1024) ,6)]
                 else:
-                    LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, int(len_box) ,6144)]
+                    LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, biggest + 1,6144)]
 
 
 
@@ -522,26 +517,25 @@ def plotterUpdater():
             #create a ColumnDataSource by passing the dict
 
             heat_source = ColumnDataSource(data=heatmap_data)
-
             latest = ContainerX[0][-1] + step
-            for i in range(int(biggest/16)):
+            l = len(LineLevel)
+            for i in range(l):
                 ContainerY[i].append(LineLevel[i])
                 ContainerY[i].pop(0)        # All values change equally
 
             ContainerX[0].append(latest)
             ContainerX[0].pop(0)        # All values change equally
-
             new_data_liveLine = {'xs' : ContainerX,
                 'ys' : ContainerY,
                 'line_color' : line_colours }
 
             liveLine_ds.data = new_data_liveLine
-            mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high=6000) ## was 5k - 25k
+            mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high= max_colour) ## was 5k - 25k
             heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
 #########TRY WITHOUT INT AND np
 
-        if(plot) and not (finished):
+        if(plot) or (finished):
             plot = 0
             #finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider1)
             #finalMiss = int(cacheDataMiss1/CoreCount)
@@ -570,6 +564,7 @@ def plotterUpdater():
             select_ds.data = dataWB
 
             x_c += 10
+            finished = 0
 
     else:
         print(" blocking callback function ")
