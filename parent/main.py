@@ -33,7 +33,7 @@ ADDR = ("::1", PORT)
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_IP) ## Create UDP socket
 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
-sock.settimeout(5)
+sock.settimeout(7)
 disconnect_msg = "DISCONNECT"
 mainQueue = Queue()
 
