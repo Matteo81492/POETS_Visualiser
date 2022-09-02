@@ -3,7 +3,6 @@
     and a line graph show idle and cache values respectively. The dashboard follows a Bootstrap
     template and is shown locally.
 '''
-from mailbox import Mailbox
 from multiprocessing import Queue
 import threading
 import sys
@@ -54,8 +53,6 @@ CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
 entered = 0
 total = 0
-execution_time = 0
-usage = 0
 
 
 # Plot Configurations
@@ -111,7 +108,7 @@ TOOLTIPS = [("core", "$index"),
 
 #Set the default option for the Hovertool tooltips
 hover=HoverTool(tooltips=TOOLTIPS)
-heatmap = figure(width = 560, height = 600, tools=[hover, TOOLS], title="Heat Map",  name = "heatmap", toolbar_location="below")
+heatmap = figure(width = 590, height = 600, tools=[hover, TOOLS], title="Heat Map",  name = "heatmap", toolbar_location="below")
 
 heatmap.axis.visible = False
 heatmap.grid.visible = False
@@ -163,9 +160,9 @@ TOOLS="hover,crosshair,undo,redo,reset,tap,save,pan"
 TOOLTIPS = [("second", "$index"),
             ("value", "$y")]
 
-line = figure(width = 720, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
+line = figure(width = 700, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
-    background_fill_color="#efefef", x_range = (0, 99))
+    background_fill_color="#efefef", x_range = (0, 60))
 line.toolbar.logo = None
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
@@ -178,8 +175,8 @@ Miss_line_ds = Miss_line.data_source
 WB_line_ds = WB_line.data_source
 
 #Separated figure for the range selector, which allows to zoom in a specific section of time
-select = figure(width = 720, title="Drag the middle and edges of the selection box to change the range above",
-            height=130, y_range=line.y_range,
+select = figure(width = 550, title="Drag the middle and edges of the selection box to change the range above",
+            height=100, y_range=line.y_range,
             x_axis_type="datetime", y_axis_type=None,
         tools="", toolbar_location=None, background_fill_color="#efefef")
 select.xaxis.formatter = PrintfTickFormatter(format="%ss")
@@ -188,7 +185,7 @@ select.ygrid.grid_line_color = None
 selectO = select.line(x = [], y =[])
 select_ds = selectO.data_source
 
-layout = column(line, select, sizing_mode="scale_width", name="line")
+layout = column(line, select, name="line")
 
 #Configurations for Bar Chart - Used for CPUIDLE count
 TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan, zoom_in,zoom_out,"
@@ -196,7 +193,7 @@ TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan, zoom_in,zoom_out,"
 TOOLTIPS = [("second", "$index"),
             ("percentage", "@top")]
 
-bar = figure(height = 580, width = 490, title="Bar Chart", name = "bar",
+bar = figure(height = 580, width = 500, title="Bar Chart", name = "bar",
         toolbar_location="below", tools=TOOLS, tooltips = TOOLTIPS, y_range = (0, 100))
 bar.toolbar.logo = None
 bar.xgrid.grid_line_color = None
@@ -209,13 +206,20 @@ bar.xaxis.ticker = SingleIntervalTicker(interval= 10)
 
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
 bar_ds = barO.data_source
+initial = dict()
+initial['x'] = [0]
+initial['top'] = [0]
+bar_ds.data = initial
 
+execution_array = [0] * 10
+
+usage_array = [0] * 10
 
 
 ## Configuration for text graph showing post-run parameters
-tdata = {'Application' : ["current","previous"],
-            'Execution Time' : [0,0],
-            'Average Utilisation': [0,0]}  
+tdata = {'Application' : range(1,11),
+            'Execution Time' : execution_array,
+            'Average Utilisation': usage_array,}  
 source = ColumnDataSource(data=tdata)
 columns = [
     TableColumn(field="Application", title="Application"),
@@ -224,7 +228,7 @@ columns = [
     TableColumn(field="Average Utilisation", title="Average Utilisation (TX/s)",
                 formatter=NumberFormatter(text_align="right")),
 ]
-table = DataTable(source=source, columns=columns, height=210, width=330, name="table", sizing_mode="scale_both")
+table = DataTable(source=source, columns=columns, height=150, width=700, name="table", sizing_mode="scale_both")#, sizing_mode="scale_both")
 
 table_ds = table.source
 
@@ -234,7 +238,7 @@ block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
 gap2 = CoreCount
 range_tool_active = 0
-idle_divider1 = CoreCount*2100000
+idle_divider1 = CoreCount*2100000 ## freq is 210 MHz
 idle_divider2 = CoreCount/100
 clear = 0
 x_c = 1
@@ -398,7 +402,7 @@ def dataUpdater():
                     
                     if(group == 10):
                         group = 0
-                        plot = 1
+                        plot += 1
                         CPUIdle1 = CPUIdle + []
                         CPUIdle = [0] * 10
                         cacheDataMiss1 = cacheDataMiss + []
@@ -421,6 +425,7 @@ def dataUpdater():
             if(entered):
                 print(disconnect_msg)
                 finished = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
+                plot += 1
                 entered = 0
         except Exception as e:
             print("issue on thread " + str(idx) + " because: " + str(e))
@@ -435,35 +440,9 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global finished, execution_time, usage, range_tool_active, current_data, plot, total, clear, x_c
+    global finished, usage, range_tool_active, current_data, plot, total, clear, x_c
 
     if not(block):    
-        if(finished) and (mainQueue.empty()):
-            print(" RENDERING OTHER GRAPHS ")
-            execution_time2 = execution_time
-            usage2 = usage
-            execution_time = maxRow + 1
-            usage = round(total/execution_time, 3)
-            newTable = {'Application' : table_ds.data['Application'],
-                    'Execution Time'   : [execution_time, execution_time2],
-                    'Average Utilisation' : [usage, usage2]}
-            table_ds.data = newTable
-
-            #######REFRESHING
-            heatmap.renderers = []
-            liveLine.renderers = []
-            empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-            mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
-            range_tool = RangeTool(x_range = line.x_range)
-            range_tool.overlay.fill_color = "navy"
-            range_tool.overlay.fill_alpha = 0.2
-            if(range_tool_active == 0):
-                select.add_tools(range_tool)
-                select.toolbar.active_multi = range_tool
-                range_tool_active = 1
-            clear = 1
-            total = 0
-
         if not (mainQueue.empty()):
             
             current_data = mainQueue.get()
@@ -533,14 +512,9 @@ def plotterUpdater():
             mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high= max_colour) ## was 5k - 25k
             heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
-#########TRY WITHOUT INT AND np
 
-        if(plot) or (finished):
-            plot = 0
-            #finalIdle = int((CPUIdle1 + ((CoreCount-counter1)*210000000))/idle_divider1)
-            #finalMiss = int(cacheDataMiss1/CoreCount)
-            #finalHit = int(cacheDataHit1/CoreCount)
-            #finalWB = int(cacheDataWB1/CoreCount)            
+        if(plot):
+            plot -= 1          
 
             dataBar = dict()
             dataBar['x'] = bar_ds.data['x'] + [x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
@@ -564,7 +538,35 @@ def plotterUpdater():
             select_ds.data = dataWB
 
             x_c += 10
+
+        if(finished) and (mainQueue.empty()):
+            print(" RENDERING OTHER GRAPHS ")           ##NOT SHIFTING VALUES DOWN, AND VALUES ARE TOO LARGE
+            np.roll(execution_array,1)
+            execution_array[0] = maxRow + 1
+            np.roll(usage_array, 1)
+            usage_array[0] = round(total/execution_array[0], 3)
+            newTable = {'Application' : table_ds.data['Application'],
+                    'Execution Time'   : execution_array,
+                    'Average Utilisation' : usage_array}
+            table_ds.data = newTable
+
+            #######REFRESHING
+            heatmap.renderers = []
+            liveLine.renderers = []
+            empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+            mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
+            range_tool = RangeTool(x_range = line.x_range)
+            range_tool.overlay.fill_color = "navy"
+            range_tool.overlay.fill_alpha = 0.2
+            if(range_tool_active == 0):
+                select.add_tools(range_tool)
+                select.toolbar.active_multi = range_tool
+                range_tool_active = 1
+                print("DONEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE FFFFFF")
+            clear = 1
+            total = 0
             finished = 0
+
 
     else:
         print(" blocking callback function ")

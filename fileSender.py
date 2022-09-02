@@ -29,7 +29,7 @@ def main():
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
-                            skiprows=1, max_rows=None, usecols=(0, 1, 12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
+                            skiprows=1, max_rows= None, usecols=(0, 1, 12, 13, 14, 15, 16, 18))      ### MAX ROW LIMIT IS MAX NUMBER OF TIME INSTANCES
     except Exception as e:
         print("Couldn't open file because " + str(e))
     
@@ -37,6 +37,8 @@ def main():
         if(s[1]>current):
             current = s[1]
             time.sleep(1)
+            if(current == 80):
+                break
         message_str = str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5]) + API_DELIMINATOR + str(s[6]) + API_DELIMINATOR + str(s[7])
         Sock.sendto(message_str.encode('utf-8'), ADDR)
         print(message_str)
