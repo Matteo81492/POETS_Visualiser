@@ -228,7 +228,7 @@ columns = [
     TableColumn(field="Average Utilisation", title="Average Utilisation (TX/s)",
                 formatter=NumberFormatter(text_align="right")),
 ]
-table = DataTable(source=source, columns=columns, height=150, width=700, name="table", sizing_mode="scale_both")#, sizing_mode="scale_both")
+table = DataTable(source=source, columns=columns, height=150, width=700, name="table", sizing_mode="scale_both")
 
 table_ds = table.source
 
@@ -440,7 +440,7 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global finished, usage, range_tool_active, current_data, plot, total, clear, x_c
+    global finished, usage, range_tool_active, current_data, plot, total, clear, x_c, execution_array, usage_array
 
     if not(block):    
         if not (mainQueue.empty()):
@@ -540,10 +540,10 @@ def plotterUpdater():
             x_c += 10
 
         if(finished) and (mainQueue.empty()):
-            print(" RENDERING OTHER GRAPHS ")           ##NOT SHIFTING VALUES DOWN, AND VALUES ARE TOO LARGE
-            np.roll(execution_array,1)
+            print(" RENDERING OTHER GRAPHS ")           
+            execution_array = np.roll(execution_array,1)
             execution_array[0] = maxRow + 1
-            np.roll(usage_array, 1)
+            usage_array = np.roll(usage_array, 1)
             usage_array[0] = round(total/execution_array[0], 3)
             newTable = {'Application' : table_ds.data['Application'],
                     'Execution Time'   : execution_array,
