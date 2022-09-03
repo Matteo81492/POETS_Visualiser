@@ -54,6 +54,11 @@ maxRow = 0 # This is the number of time instances needed to plot the thread data
 entered = 0
 total = 0
 
+#### FPGA coordinates list used to transform non contiguous addresses into contiguous ones
+
+FPGA_coords = [0] * 6 # 6 entries because it supports 1 POETS box = 6 working FPGAs
+
+
 
 # Plot Configurations
 ############################################################################
@@ -118,7 +123,7 @@ max_colour = 4000
 
 #Fixed heatmap color, going from light green to dark red
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-bar_map = LinearColorMapper(palette = colours, low = 5000, high = 25000 )
+bar_map = LinearColorMapper(palette = colours, low = 0, high = 2500 )#5 to 25k
 color_bar = ColorBar(color_mapper=bar_map,
                 ticker=SingleIntervalTicker(interval = 2500),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
@@ -375,6 +380,9 @@ def dataUpdater():
     plot = 0
     group = 0
     biggest = 1
+    mask1 = 0b0000001111111111 
+    f = 0
+ 
     while True:
         try:
             data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
@@ -389,6 +397,17 @@ def dataUpdater():
             entered = 1
             splitMsg = msg.split(API_DELIMINATOR)
             idx = int(float(splitMsg[0]))
+            FPGA_field = bin(idx)[2:-10]
+            if(FPGA_field):            ## IF FPGA FIELD IS DIFFERENT THAN ZERO AND IT EXISTS DO CONVERSION
+                if FPGA_field in FPGA_coords:
+                    new_field = FPGA_coords.index(FPGA_field) + 1
+                    mask2 = (new_field << 10) + 0b0000000000
+                else:
+                    FPGA_coords[f] = FPGA_field
+                    f += 1
+                    new_field = f
+                    mask2 = (new_field << 10) + 0b0000000000
+                idx = (idx & mask1) | mask2
             if(idx > biggest):
                 biggest = idx
             cidx = int(float(splitMsg[1]))

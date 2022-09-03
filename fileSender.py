@@ -25,7 +25,7 @@ def signal_handler(signal_in, frame):
 def main():
     current = 0  
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './new_data/instrumentation_512x512.csv'
+    fName = './new_data/instrumentation.csv'
     try:
         file_obj = open(fName, "rb")
         data = numpy.loadtxt(file_obj, delimiter=",",
@@ -37,8 +37,8 @@ def main():
         if(s[1]>current):
             current = s[1]
             time.sleep(1)
-            if(current == 11):
-                break
+         #   if(current == 11):
+          #      break
         message_str = str(s[0]) + API_DELIMINATOR + str(s[1]) + API_DELIMINATOR + str(s[2]) + API_DELIMINATOR + str(s[3]) + API_DELIMINATOR + str(s[4]) + API_DELIMINATOR + str(s[5]) + API_DELIMINATOR + str(s[6]) + API_DELIMINATOR + str(s[7])
         Sock.sendto(message_str.encode('utf-8'), ADDR)
         print(message_str)
