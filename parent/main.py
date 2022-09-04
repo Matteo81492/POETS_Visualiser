@@ -1,5 +1,5 @@
-''' This file generates a dashboard that includes a live heatmap and multiline chart of the 
-    POETS data that is received through the socket. After the application run is over, a bar chart
+''' This file generates a dashboard that includes a live heatmap and a multiline chart of the 
+    POETS data that is received through the socket. At the bottom of the dashboard a bar chart
     and a line graph show idle and cache values respectively. The dashboard follows a Bootstrap
     template and is shown locally.
 '''
@@ -14,7 +14,7 @@ import numpy as np
 import random
 from bokeh.models import (ColorBar, ColumnDataSource, SingleIntervalTicker,
                           LinearColorMapper, PrintfTickFormatter, HoverTool,
-                          NumberFormatter, RangeTool, Range1d, StringFormatter, TableColumn)
+                          NumberFormatter, RangeTool, StringFormatter, TableColumn)
 from bokeh.plotting import figure, curdoc
 from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.models import Button, Dropdown
@@ -25,24 +25,26 @@ from bokeh.palettes import Turbo256 as palette2
 # Socket Configurations
 ############################################################################
 API_DELIMINATOR = "-" 
-PORT = 5064 # Random port
-host = socket.gethostname()
-SERVER = socket.getaddrinfo(host, PORT, socket.AF_INET6)    ## Automatically get local IPV6 Address 
-ADDR = ("::1", PORT)
+PORT = 5064
+#host = socket.gethostname()
+#SERVER = socket.getaddrinfo(host, PORT, socket.AF_INET6)    ## Automatically get local IPV6 Address 
+ADDR = ("::1", PORT)  ## local address for now
 sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_IP) ## Create UDP socket
 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, False)
 sock.bind(ADDR)
 sock.settimeout(7)
 disconnect_msg = "DISCONNECT"
-mainQueue = Queue()
+
 
 # POETS Configurations
 ############################################################################
 refresh_rate = 900 ## Time in millisecond for updating live plots
 ThreadCount = 49152   # The actual number of threads present in a POETS box is 6144 - 49152 in total
 ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+mainQueue = Queue()
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+
 n = 16 # number of threads in a core
 root_core = int(math.sqrt(ThreadCount / n))
 root_mailbox = int(math.sqrt(ThreadCount / 64))
@@ -55,12 +57,11 @@ entered = 0
 total = 0
 
 #### FPGA coordinates list used to transform non contiguous addresses into contiguous ones
-
-FPGA_coords = [0] * 6 # 6 entries because it supports 1 POETS box = 6 working FPGAs
-
+FPGA_coords = [0] * 48 # 48 entries because it supports 8 POETS box hence 48 working FPGAs
 
 
-# Plot Configurations
+
+# Plot Configurations, calculating heatmap coordinates based on hierarchical view
 ############################################################################
 row_x = [x for x in range(root_core)]
 core_count_x = []
@@ -104,7 +105,6 @@ selected_count_x = core_count_x
 selected_count_y = core_count_y
 
 #Configurations for Heatmap - Used for TX/S values
-
 #Extra tools available on the webpage
 TOOLS="crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,"
 
@@ -119,13 +119,13 @@ heatmap.axis.visible = False
 heatmap.grid.visible = False
 heatmap.toolbar.logo = None
 
-max_colour = 4000
-
-#Fixed heatmap color, going from light green to dark red
+#Fixed heatmap colours, going from light green to dark red
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
+max_colour = 3000   ## variable used to change colour range for different hierarchical views
+
 bar_map = LinearColorMapper(palette = colours, low = 0, high = 2500 )#5 to 25k
 color_bar = ColorBar(color_mapper=bar_map,
-                ticker=SingleIntervalTicker(interval = 2500),
+                ticker=SingleIntervalTicker(interval = 250),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
 
 heatmap.add_layout(color_bar, 'right')
@@ -136,30 +136,31 @@ TOOLTIPS2 = [("Core", "$index")]
 hover2=HoverTool(tooltips=TOOLTIPS2)
 liveLine = figure(height = 590, width = 720, tools=[hover2, TOOLS], title = "Live Instrumentation", name = "liveLine", toolbar_location="below", y_axis_location = "right")
 liveLine.toolbar.logo = None
-liveLine.x_range.follow="end"
+liveLine.x_range.follow="end"       ## Makes x axis follow the time value
 liveLine.x_range.follow_interval = 30
 liveLine.x_range.range_padding=0
 liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
 liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
 
-step = refresh_rate/1000 # Step for X range
+step = refresh_rate/1000 # Step for X axis
 zero_list = [0] * 4
 step_list = [i * step for i in range(4)]
 
+### Containers used to store point coordiantes for multi-line plotting
 ContainerX = np.empty((CoreCount,),  dtype = object)
 ContainerY = np.empty((CoreCount,), dtype =  object)
 line_colours = []
 for i in range(len(ContainerY)): 
     ContainerY[i]=[0,0,0,0]
     ContainerX[i]=step_list 
-    line_colours.append(random.choice(palette2)) #### try to eliminate random
+    line_colours.append(random.choice(palette2))
 
-
+### empty plot data, to be filled during live run
 liveLineO = liveLine.multi_line(xs = [], ys= [], line_color = []) 
 liveLine_ds = liveLineO.data_source
-
 TOOLS="hover,crosshair,undo,redo,reset,tap,save,pan"
+
 
 #Configurations for Line plot - Used for Cache Miss - Hit - WB values
 TOOLTIPS = [("second", "$index"),
@@ -189,8 +190,9 @@ select.ygrid.grid_line_color = None
 
 selectO = select.line(x = [], y =[])
 select_ds = selectO.data_source
-
 layout = column(line, select, name="line")
+range_tool_active = 0
+
 
 #Configurations for Bar Chart - Used for CPUIDLE count
 TOOLS="hover,crosshair,undo,redo,reset,tap,save, pan, zoom_in,zoom_out,"
@@ -211,17 +213,21 @@ bar.xaxis.ticker = SingleIntervalTicker(interval= 10)
 
 barO = bar.vbar(x=[], top = [], width=0.2, color="#718dbf")
 bar_ds = barO.data_source
+
+## specified initial values in order to show graph even before application runs
 initial = dict()
 initial['x'] = [0]
 initial['top'] = [0]
 bar_ds.data = initial
 
+## values used to calculate percentage of idle time
+idle_divider1 = CoreCount*2100000 ## freq is 210 MHz
+idle_divider2 = CoreCount/100
+
+
+## Configuration for table showing post-run parameters
 execution_array = [0] * 10
-
 usage_array = [0] * 10
-
-
-## Configuration for text graph showing post-run parameters
 tdata = {'Application' : range(1,11),
             'Execution Time' : execution_array,
             'Average Utilisation': usage_array,}  
@@ -238,13 +244,10 @@ table = DataTable(source=source, columns=columns, height=150, width=700, name="t
 table_ds = table.source
 
 
-finished = 0 # Variable used to start other graphs
+finished = 0 # Variable used to indicate end of run
 block = 0 # Variable used to freeze the Heatmap
 gap1 = 16
 gap2 = CoreCount
-range_tool_active = 0
-idle_divider1 = CoreCount*2100000 ## freq is 210 MHz
-idle_divider2 = CoreCount/100
 clear = 0
 x_c = 1
 
@@ -258,7 +261,7 @@ def signal_handler(*args, **kwargs):
 
 def stopper():
     global block
-    print("STOPPING live data")
+    print("STOPPING live updates")
     block = ~block
 
 def clicker_h(event):
@@ -278,7 +281,7 @@ def clicker_h(event):
         gap1 = 64
         selected_count_x = mailbox_count_x
         selected_count_y = mailbox_count_y
-        max_colour = 1000
+        max_colour = 800
         heatmap.tools[0].tooltips = [("mailbox", "$index"),
                                     ("TX/s", "@intensity")]
                                     
@@ -286,14 +289,14 @@ def clicker_h(event):
         gap1 = 1024
         selected_count_x = board_count_x
         selected_count_y = board_count_y
-        max_colour = 800
+        max_colour = 400
         heatmap.tools[0].tooltips = [("board", "$index"),
                                     ("TX/s", "@intensity")]
     else:
         gap1 = 6144
         selected_count_x = box_count_x
         selected_count_y = box_count_y
-        max_colour = 400
+        max_colour = 200
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
@@ -310,7 +313,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-            line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2)) 
         gap2 = CoreCount
         liveLine.tools[0].tooltips = [("core", "$index")]
 
@@ -321,7 +324,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-            line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2))
         gap2 = ThreadCount
         liveLine.tools[0].tooltips = [("thread", "$index")]
 
@@ -332,7 +335,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-            line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2))
         gap2 = MailboxCount
         liveLine.tools[0].tooltips = [("mailbox", "$index")]
                                     
@@ -343,7 +346,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-            line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2))
         gap2 = BoardCount
         liveLine.tools[0].tooltips = [("board", "$index")]
 
@@ -354,7 +357,7 @@ def clicker_l(event):
         for i in range(len(ContainerY)): 
             ContainerY[i]=[0,0,0,0]
             ContainerX[i]=step_list 
-            line_colours.append(random.choice(palette2)) #### try to eliminate random
+            line_colours.append(random.choice(palette2))
         gap2 = BoxCount
         liveLine.tools[0].tooltips = [("box", "$index")]
 
@@ -385,7 +388,7 @@ def dataUpdater():
  
     while True:
         try:
-            data, address = sock.recvfrom(65535)    ## Potential Bottleneck, no parallel behaviour, look into network buffering
+            data, address = sock.recvfrom(65535)   
             msg = data.decode("utf-8")
             if(clear):
                 line.renderers = []
@@ -397,16 +400,19 @@ def dataUpdater():
             entered = 1
             splitMsg = msg.split(API_DELIMINATOR)
             idx = int(float(splitMsg[0]))
+
+            ############ FPGA field corresponds to the six MSB bits of the thread address, the following conversion makes the address range contiguous
+
             FPGA_field = bin(idx)[2:-10]
             if(FPGA_field):            ## IF FPGA FIELD IS DIFFERENT THAN ZERO AND IT EXISTS DO CONVERSION
                 if FPGA_field in FPGA_coords:
                     new_field = FPGA_coords.index(FPGA_field) + 1
-                    mask2 = (new_field << 10) + 0b0000000000
+                    mask2 = (new_field << 10)
                 else:
                     FPGA_coords[f] = FPGA_field
                     f += 1
                     new_field = f
-                    mask2 = (new_field << 10) + 0b0000000000
+                    mask2 = (new_field << 10)
                 idx = (idx & mask1) | mask2
             if(idx > biggest):
                 biggest = idx
@@ -415,13 +421,13 @@ def dataUpdater():
                 ThreadLevel[idx] = int(float(splitMsg[7]))                   
                 div = int(idx/n)
                 if not idx%n and div < CoreCount:        ## Take only Thread 0 of each core as a representative of the entire core counter
-                    if(maxRow < cidx):       ## Count max number of rows, this determines Points to plot. Problem if fewer than 2 rows
+                    if(maxRow < cidx):       
                         maxRow = cidx
                         group += 1
                     
-                    if(group == 10):
+                    if(group == 10):                    ## After every ten seconds of data refresh counters
                         group = 0
-                        plot += 1
+                        plot += 1                      
                         CPUIdle1 = CPUIdle + []
                         CPUIdle = [0] * 10
                         cacheDataMiss1 = cacheDataMiss + []
@@ -443,8 +449,8 @@ def dataUpdater():
         except socket.timeout:
             if(entered):
                 print(disconnect_msg)
-                finished = 1      ##WHEN DISCONNECTION HAPPENS RUN OTHER GRAPHS
-                plot += 1
+                finished = 1      ##after finishing the run display table data
+                plot += 1        
                 entered = 0
         except Exception as e:
             print("issue on thread " + str(idx) + " because: " + str(e))
@@ -452,7 +458,7 @@ def dataUpdater():
 def bufferUpdater():
     global mainQueue, total
     while True:
-        if(entered) and not ((ThreadLevel==current_data).all()):
+        if(entered) and not ((ThreadLevel==current_data).all()):        ## Queue new data in order to avoid losing it in case of slow rendering
             mainQueue.put(ThreadLevel, False)
             for e in range(biggest+1):
                 total += np.sum(ThreadLevel[e])
@@ -470,7 +476,6 @@ def plotterUpdater():
             if(gap1 == 16):                     ## CORE VIEW
                 HeatmapLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest +1 ,n)]
 
-
             elif(gap1 == 64):                   ## MAILBOX VIEW
                 HeatmapLevel = [sum(current_data[j:j+gap1])//gap1 for j in range(0, biggest + 1, gap1)]
 
@@ -480,29 +485,29 @@ def plotterUpdater():
             else:                               ## BOX VIEW
                 HeatmapLevel = [sum(current_data[j:j+biggest])//gap1 for j in range(0, biggest + 1, biggest)]
 
-            if(gap2 == CoreCount):                     ## CORE VIEW 
+            if(gap2 == CoreCount):              ## CORE VIEW 
                 if(gap1 == 16):
                     LineLevel = HeatmapLevel
                 else:
                     LineLevel = [sum(current_data[j:j+n])//n for j in range(0, biggest + 1 ,n)]
             
-            elif(gap2 == MailboxCount):                     ## MAILBOX VIEW 
+            elif(gap2 == MailboxCount):         ## MAILBOX VIEW 
                 if(gap1 == 64):
                     LineLevel = HeatmapLevel
                 else:
                     LineLevel = [sum(current_data[j:j+64])//64 for j in range(0, biggest + 1 ,64)]
 
-            elif(gap2 == ThreadCount):                   ## THREAD VIEW
+            elif(gap2 == ThreadCount):          ## THREAD VIEW
                 LineLevel = ThreadLevel[0:biggest+1]
 
-            elif(gap2 == BoardCount):                     ## BOARD VIEW 
+            elif(gap2 == BoardCount):           ## BOARD VIEW 
                 if(gap1 == 1024):
                     LineLevel = HeatmapLevel
                 else:
                     LineLevel = [sum(current_data[j:j+1024])//1024 for j in range(0, biggest + 1 ,1024)]
             
             else:
-                if(gap1 == 6144):
+                if(gap1 == 6144):               ## BOX VIEW 
                     LineLevel = HeatmapLevel
                 else:
                     LineLevel = [sum(current_data[j:j+6144])//6144 for j in range(0, biggest + 1,6144)]
@@ -511,24 +516,24 @@ def plotterUpdater():
 
             heatmap_data = {'x' : selected_count_x,
                 'y' : selected_count_y,
-                'intensity': HeatmapLevel + [0] * (len(selected_count_x) - len(HeatmapLevel))}      # was ThreadLevel
-            #create a ColumnDataSource by passing the dict
+                'intensity': HeatmapLevel + [0] * (len(selected_count_x) - len(HeatmapLevel))}  ## Missing tiles are automatically set to zero intensity
 
+            #create a ColumnDataSource by passing the dict
             heat_source = ColumnDataSource(data=heatmap_data)
             latest = ContainerX[0][-1] + step
             l = len(LineLevel)
             for i in range(l):
                 ContainerY[i].append(LineLevel[i])
-                ContainerY[i].pop(0)        # All values change equally
+                ContainerY[i].pop(0)        
 
             ContainerX[0].append(latest)
-            ContainerX[0].pop(0)        # All values change equally
+            ContainerX[0].pop(0)        # All X values change equally since ContainerX arrays are all connected
             new_data_liveLine = {'xs' : ContainerX,
                 'ys' : ContainerY,
                 'line_color' : line_colours }
 
             liveLine_ds.data = new_data_liveLine
-            mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high= max_colour) ## was 5k - 25k
+            mapper = linear_cmap(field_name="intensity", palette=colours, low=0, high= max_colour )
             heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
 
@@ -569,7 +574,7 @@ def plotterUpdater():
                     'Average Utilisation' : usage_array}
             table_ds.data = newTable
 
-            #######REFRESHING
+            ####### REFRESHING
             heatmap.renderers = []
             liveLine.renderers = []
             empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
@@ -581,7 +586,6 @@ def plotterUpdater():
                 select.add_tools(range_tool)
                 select.toolbar.active_multi = range_tool
                 range_tool_active = 1
-                print("DONEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE FFFFFF")
             clear = 1
             total = 0
             finished = 0
@@ -602,35 +606,42 @@ dataThread = threading.Thread(name='data',target=dataUpdater)
 dataThread.daemon = True
 dataThread.start()
 
+# Buffer thread for the Queue object
 bufferThread = threading.Thread(name='buffer',target=bufferUpdater)
 bufferThread.daemon = True
 bufferThread.start()
 
-# Setup
+# Adding the plots to the current document
 curdoc().add_root(liveLine)
 curdoc().add_root(heatmap)
 curdoc().add_root(bar)
 curdoc().add_root(layout)
 curdoc().add_root(table)
 
-
+# Button Object
 button = Button(label="Stop/Resume", name = "button", default_size = 150)
 button.on_click(stopper)
 curdoc().add_root(button)
 
+# Dropdown list for the Heatmap
 menu_h = Dropdown(label = "Select Hierarchy", menu = ["BOX", "BOARD", "MAILBOX", "CORE"], name = "menu_h")
 menu_h.on_click(clicker_h)
 curdoc().add_root(menu_h)
 
+# Dropdown list for the Live Line plot
 menu_l = Dropdown(label = "Select Hierarchy", menu = ["BOX", "BOARD", "MAILBOX", "CORE", "THREAD"], name = "menu_l")
 menu_l.on_click(clicker_l)
 curdoc().add_root(menu_l)
 
 curdoc().title = "POETS Dashboard"
+
+# Some system parameters to display on the webpage
 curdoc().template_variables['stats_names'] = [ 'Threads', 'Cores', 'Refresh']
 curdoc().template_variables['stats'] = {
     'Threads'     : {'icon': None,          'value': 49152,  'label': 'Total Threads'},
     'Cores'       : {'icon': None,        'value': 3072,  'label': 'Total Cores'},
     'Refresh'        : {'icon': None,        'value': refresh_rate,  'label': 'Refresh Rate (ms)'},
 }
-curdoc().add_periodic_callback(plotterUpdater, refresh_rate) # or processThread = threading.Thread(name='process',target=UpdateThread, args=(recQ,))Verz
+
+# PlotterUpdater is the callback function for the current document
+curdoc().add_periodic_callback(plotterUpdater, refresh_rate) 

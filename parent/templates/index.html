@@ -1,3 +1,6 @@
+<!-- Dashboard layout based on a Bootstrap template -->
+
+
 {% extends base %}
 {% block preamble %}
 
@@ -15,10 +18,10 @@
   <div class="main_container">
 
 
-    <!-- page content -->
+    <!-- the dashboard is divided in rows, in which the objects are embedded -->
     <div class="right_col" role="main">
 
-      <!-- top tiles -->
+
       <div class="row tile_count">
         <h2>POETS Dashboard</h2>
         {% for name in stats_names %}
@@ -29,8 +32,8 @@
         {% endfor %}
         {{ embed(roots.button) }}
       </div>
-      <!-- /top tiles -->
 
+      <!-- top row containing Heatmap and Live Line -->
       <div class="row">
         <div class="col-md-6 col-sm-6 col-xs-6">
           <div class="x_panel tile fixed_height_320 overflow_hidden">
@@ -54,7 +57,7 @@
             </div>
           </div>
       </div>
-
+      <!-- bottom row containing Idle Time, Cache Data and History Table -->
       <div class="row">
 
         <div class="col-md-6 col-sm-6 col-xs-6">
@@ -87,6 +90,5 @@
     </div>
   </div>
 </div>
-<!-- /page content -->
 
 {% endblock %}
