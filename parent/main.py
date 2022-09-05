@@ -397,6 +397,8 @@ def dataUpdater():
             if(clear):
                 maxRow = 0
                 clear_column = 1
+                FPGA_coords = [0] * 47
+                f = 1
                 clear = 0
 
             entered = 1
@@ -569,7 +571,6 @@ def plotterUpdater():
             dataWB['x'] = WB_line_ds.data['x'] + [x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
             dataWB['y'] = WB_line_ds.data['y'] + [(cacheDataWB1[0]/CoreCount)] + [(cacheDataWB1[1]/CoreCount)] + [(cacheDataWB1[2]/CoreCount)] + [(cacheDataWB1[3]/CoreCount)] + [(cacheDataWB1[4]/CoreCount)] + [(cacheDataWB1[5]/CoreCount)] + [(cacheDataWB1[6]/CoreCount)] + [(cacheDataWB1[7]/CoreCount)] + [(cacheDataWB1[8]/CoreCount)] + [(cacheDataWB1[9]/CoreCount)]
 
-
             x_c += 10
 
             if(final_plot) and not (plot):
@@ -611,7 +612,7 @@ def plotterUpdater():
             usage_array = np.roll(usage_array, 1)
             usage_array[0] = round(total/execution_array[0], 3)
             newTable = {'Application' : table_ds.data['Application'],
-                    'Execution Time'   : execution_array,
+                    'Execution Time' : execution_array,
                     'Average Utilisation' : usage_array}
             table_ds.data = newTable
 
