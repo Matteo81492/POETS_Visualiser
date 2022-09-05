@@ -121,11 +121,11 @@ heatmap.toolbar.logo = None
 
 #Fixed heatmap colours, going from light green to dark red
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-max_colour = 2000   ## variable used to change colour range for different hierarchical views
+max_colour = 1000   ## variable used to change colour range for different hierarchical views
 
 bar_map = LinearColorMapper(palette = colours, low = 0, high = 2000 )#5 to 25k
 color_bar = ColorBar(color_mapper=bar_map,
-                ticker=SingleIntervalTicker(interval = 200),
+                ticker=SingleIntervalTicker(interval = 100),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
 
 heatmap.add_layout(color_bar, 'right')
@@ -274,7 +274,7 @@ def clicker_h(event):
         gap1 = 16
         selected_count_x = core_count_x
         selected_count_y = core_count_y
-        max_colour = 2000
+        max_colour = 1000
         heatmap.tools[0].tooltips = [("core", "$index"),
                                     ("TX/s", "@intensity")]
                             
@@ -282,7 +282,7 @@ def clicker_h(event):
         gap1 = 64
         selected_count_x = mailbox_count_x
         selected_count_y = mailbox_count_y
-        max_colour = 800
+        max_colour = 500
         heatmap.tools[0].tooltips = [("mailbox", "$index"),
                                     ("TX/s", "@intensity")]
                                     
@@ -290,14 +290,14 @@ def clicker_h(event):
         gap1 = 1024
         selected_count_x = board_count_x
         selected_count_y = board_count_y
-        max_colour = 400
+        max_colour = 200
         heatmap.tools[0].tooltips = [("board", "$index"),
                                     ("TX/s", "@intensity")]
     else:
         gap1 = 6144
         selected_count_x = box_count_x
         selected_count_y = box_count_y
-        max_colour = 200
+        max_colour = 100
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
@@ -411,10 +411,11 @@ def dataUpdater():
                     mask2 = (new_field << 10)
                 else:
                     FPGA_coords[f] = FPGA_field
+                    print(str(f) + " FPGA boards active")
                     f = (f+1)%47
                     mask2 = (f << 10)
                 idx = (idx & mask1) | mask2
-                
+
             if(idx > biggest):
                 biggest = idx
             cidx = int(float(splitMsg[1]))
@@ -600,8 +601,6 @@ def plotterUpdater():
             WB_line_ds.data['y'] = []           
             bar_ds.data['x'] = []
             bar_ds.data['top'] = []
-            #select_ds.data['x'] = []
-            #select_ds.data['y'] = []
             clear_column = 0
 
         if(finished) and (mainQueue.empty()):
