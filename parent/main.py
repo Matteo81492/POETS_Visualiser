@@ -46,18 +46,17 @@ mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty a
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 
 n = 16 # number of threads in a core
-root_core = int(math.sqrt(ThreadCount / n))
-root_mailbox = int(math.sqrt(ThreadCount / 64))
-root_board = int(math.sqrt(ThreadCount / 1024))
-root_box = int(math.sqrt(ThreadCount / 6144))
+root_core = 48 
+root_mailbox = 24 
+root_board = 6 
+root_box = 2 
 
-CoreCount = root_core * root_core
 maxRow = 0 # This is the number of time instances needed to plot the thread data
 entered = 0
 total = 0
 
 #### FPGA coordinates list used to transform non contiguous addresses into contiguous ones
-FPGA_coords = [0] * 48 # 48 entries because it supports 8 POETS box hence 48 working FPGAs
+FPGA_coords = [0] * 47 # 48 entries because it supports 8 POETS box hence 48 working FPGAs
 
 
 
@@ -66,16 +65,17 @@ FPGA_coords = [0] * 48 # 48 entries because it supports 8 POETS box hence 48 wor
 row_x = [x for x in range(root_core)]
 core_count_x = []
 core_count_y = []
-for i in range(root_core):
+for i in range(root_core + 16): ## + 16 because sixteen extra rows are needed to reach 3072 mailbox count
     core_count_x.extend(row_x)
     column_y = [i*2 for x in range(root_core)]
     core_count_y.extend(column_y)
+CoreCount = len(core_count_x)
 
 
 row_x = [x for x in range(root_mailbox)]
 mailbox_count_x = []
 mailbox_count_y = []
-for i in range(root_mailbox):
+for i in range(root_mailbox + 8): ## + 8 because eight extra rows are needed to reach 768 mailbox count
     mailbox_count_x.extend(row_x)
     column_y = [i * 2 for x in range(root_mailbox)]
     mailbox_count_y.extend(column_y)
@@ -386,7 +386,7 @@ def dataUpdater():
     biggest = 1
     mask1 = 0b0000001111111111 
     final_plot
-    f = 0
+    f = 1
     clear_column = 0
  
     while True:
@@ -411,10 +411,10 @@ def dataUpdater():
                     mask2 = (new_field << 10)
                 else:
                     FPGA_coords[f] = FPGA_field
-                    f += 1
-                    new_field = f
-                    mask2 = (new_field << 10)
+                    f = (f+1)%47
+                    mask2 = (f << 10)
                 idx = (idx & mask1) | mask2
+                
             if(idx > biggest):
                 biggest = idx
             cidx = int(float(splitMsg[1]))
