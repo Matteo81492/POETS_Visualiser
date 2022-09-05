@@ -56,9 +56,6 @@ maxRow = 0 # This is the number of time instances needed to plot the thread data
 entered = 0
 total = 0
 
-#### FPGA coordinates list used to transform non contiguous addresses into contiguous ones
-FPGA_coords = [0] * 47 # 48 entries because it supports 8 POETS box hence 48 working FPGAs
-
 
 
 # Plot Configurations, calculating heatmap coordinates based on hierarchical view
@@ -385,6 +382,8 @@ def dataUpdater():
     plot = 0
     group = 0
     biggest = 1
+    #### FPGA coordinates list used to transform non contiguous addresses into contiguous ones
+    FPGA_coords = [0] * 47 # 48 entries because it supports 8 POETS box hence 48 working FPGAs
     mask1 = 0b0000001111111111 
     final_plot
     f = 1
