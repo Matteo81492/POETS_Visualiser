@@ -44,6 +44,7 @@ ThreadLevel = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uin
 mainQueue = Queue()
 mainQueue.put(ThreadLevel, False) ## initialise queue object so it isn't empty at start
 current_data = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
+empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
 
 n = 16 # number of threads in a core
 root_core = 48 
@@ -123,7 +124,7 @@ heatmap.toolbar.logo = None
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
 max_colour = 1000   ## variable used to change colour range for different hierarchical views
 
-bar_map = LinearColorMapper(palette = colours, low = 0, high = 2000 )#5 to 25k
+bar_map = LinearColorMapper(palette = colours, low = 0, high = 1000 )#5 to 25k
 color_bar = ColorBar(color_mapper=bar_map,
                 ticker=SingleIntervalTicker(interval = 100),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
@@ -168,7 +169,7 @@ TOOLTIPS = [("second", "$index"),
 
 line = figure(width = 700, title = "Line Graph", tools = TOOLS, tooltips = TOOLTIPS, height=300, toolbar_location="below",
     x_axis_type="datetime", x_axis_location="above", y_axis_type="log", y_range=(10**2, 10**9),
-    background_fill_color="#efefef", x_range = (0, 60))
+    background_fill_color="#efefef", x_range = (0, 30))
 line.toolbar.logo = None
 line.xaxis.formatter = PrintfTickFormatter(format="%ss")
 
@@ -301,7 +302,7 @@ def clicker_h(event):
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
-    mainQueue.put(ThreadLevel)
+    mainQueue.put(empty)
 
 def clicker_l(event):
     global ContainerX, ContainerY, line_colours, gap2
@@ -362,7 +363,7 @@ def clicker_l(event):
         gap2 = BoxCount
         liveLine.tools[0].tooltips = [("box", "$index")]
 
-    mainQueue.put(ThreadLevel)
+    mainQueue.put(empty)
 
 
 
@@ -616,7 +617,6 @@ def plotterUpdater():
 
             print("REFRESHING")
             ####### REFRESHING
-            empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
             mainQueue.put(empty, False) ## Add three void data sets to space application runs
             mainQueue.put(empty, False) 
             mainQueue.put(empty, False) 
