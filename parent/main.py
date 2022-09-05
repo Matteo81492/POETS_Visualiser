@@ -121,11 +121,11 @@ heatmap.toolbar.logo = None
 
 #Fixed heatmap colours, going from light green to dark red
 colours = ["#75968f", "#a5bab7", "#c9d9d3", "#e2e2e2", "#dfccce", "#ddb7b1", "#cc7878", "#933b41", "#550b1d"]
-max_colour = 3000   ## variable used to change colour range for different hierarchical views
+max_colour = 2000   ## variable used to change colour range for different hierarchical views
 
-bar_map = LinearColorMapper(palette = colours, low = 0, high = 2500 )#5 to 25k
+bar_map = LinearColorMapper(palette = colours, low = 0, high = 2000 )#5 to 25k
 color_bar = ColorBar(color_mapper=bar_map,
-                ticker=SingleIntervalTicker(interval = 250),
+                ticker=SingleIntervalTicker(interval = 200),
                 formatter=PrintfTickFormatter(format="%d"+" TX/s"))
 
 heatmap.add_layout(color_bar, 'right')
@@ -250,6 +250,7 @@ gap1 = 16
 gap2 = CoreCount
 clear = 0
 x_c = 1
+final_plot = 0
 
 
 def signal_handler(*args, **kwargs):
@@ -273,7 +274,7 @@ def clicker_h(event):
         gap1 = 16
         selected_count_x = core_count_x
         selected_count_y = core_count_y
-        max_colour = 3000
+        max_colour = 2000
         heatmap.tools[0].tooltips = [("core", "$index"),
                                     ("TX/s", "@intensity")]
                             
@@ -368,7 +369,7 @@ def clicker_l(event):
 
 def dataUpdater():
     print(" IN DATA UPDATER ")
-    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1, clear, biggest
+    global ThreadLevel, cacheDataMiss1, cacheDataHit1, cacheDataWB1, CPUIdle1, finished, maxRow, entered, plot, counter1, clear, biggest, final_plot, clear_column
     idx = 0
     counter1 = 0
     cacheDataMiss1 = 0
@@ -384,17 +385,17 @@ def dataUpdater():
     group = 0
     biggest = 1
     mask1 = 0b0000001111111111 
+    final_plot
     f = 0
+    clear_column = 0
  
     while True:
         try:
             data, address = sock.recvfrom(65535)   
             msg = data.decode("utf-8")
             if(clear):
-                line.renderers = []
-                bar.renderers = []
-                select.renderers = []
                 maxRow = 0
+                clear_column = 1
                 clear = 0
 
             entered = 1
@@ -448,9 +449,20 @@ def dataUpdater():
                 print("idx range is out of bound")
         except socket.timeout:
             if(entered):
+                group = 0
+                final_plot = 10 - (maxRow%10)
+                CPUIdle1 = CPUIdle + []
+                CPUIdle = [0] * 10
+                cacheDataMiss1 = cacheDataMiss + []
+                cacheDataMiss = [0] * 10
+                cacheDataHit1 = cacheDataHit + []
+                cacheDataHit = [0] * 10
+                cacheDataWB1 = cacheDataWB + []
+                cacheDataWB = [0] * 10
+                counter1 = counter + []
+                counter = [0] * 10            
                 print(disconnect_msg)
                 finished = 1      ##after finishing the run display table data
-                plot += 1        
                 entered = 0
         except Exception as e:
             print("issue on thread " + str(idx) + " because: " + str(e))
@@ -465,7 +477,7 @@ def bufferUpdater():
         time.sleep(0.9)
 
 def plotterUpdater():
-    global finished, usage, range_tool_active, current_data, plot, total, clear, x_c, execution_array, usage_array
+    global finished, usage, range_tool_active, current_data, plot, total, clear, x_c, execution_array, usage_array, final_plot, clear_column
 
     if not(block):    
         if not (mainQueue.empty()):
@@ -537,36 +549,65 @@ def plotterUpdater():
             heatmap.rect(x='x',  y='y', width = 1, height = 2, source = heat_source, fill_color=mapper, line_color = "grey")
 
 
-        if(plot):
-            plot -= 1          
+        if(plot) or (final_plot):
 
             dataBar = dict()
             dataBar['x'] = bar_ds.data['x'] + [x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
             dataBar['top'] = bar_ds.data['top'] + [(CPUIdle1[0]/idle_divider1 + (CoreCount-counter1[0])/idle_divider2)] + [(CPUIdle1[1]/idle_divider1 + (CoreCount-counter1[1])/idle_divider2)] + [(CPUIdle1[2]/idle_divider1 + (CoreCount-counter1[2])/idle_divider2)] + [(CPUIdle1[3]/idle_divider1 + (CoreCount-counter1[3])/idle_divider2)] + [(CPUIdle1[4]/idle_divider1 + (CoreCount-counter1[4])/idle_divider2)] + [(CPUIdle1[5]/idle_divider1 + (CoreCount-counter1[5])/idle_divider2)] + [(CPUIdle1[6]/idle_divider1 + (CoreCount-counter1[6])/idle_divider2)] + [(CPUIdle1[7]/idle_divider1 + (CoreCount-counter1[7])/idle_divider2)] + [(CPUIdle1[8]/idle_divider1 + (CoreCount-counter1[8])/idle_divider2)] + [(CPUIdle1[9]/idle_divider1 + (CoreCount-counter1[9])/idle_divider2)]
-            bar_ds.data = dataBar
             
             dataMiss = dict()
             dataMiss['x'] = Miss_line_ds.data['x'] + [x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
             dataMiss['y'] = Miss_line_ds.data['y'] + [(cacheDataMiss1[0]/CoreCount)] + [(cacheDataMiss1[1]/CoreCount)] + [(cacheDataMiss1[2]/CoreCount)]  + [(cacheDataMiss1[3]/CoreCount)] + [(cacheDataMiss1[4]/CoreCount)] + [(cacheDataMiss1[5]/CoreCount)] + [(cacheDataMiss1[6]/CoreCount)] + [(cacheDataMiss1[7]/CoreCount)]  + [(cacheDataMiss1[8]/CoreCount)] + [(cacheDataMiss1[9]/CoreCount)]
-            Miss_line_ds.data = dataMiss
 
             dataHit = dict()
             dataHit['x'] = Hit_line_ds.data['x'] +[x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
             dataHit['y'] = Hit_line_ds.data['y'] + [(cacheDataHit1[0]/CoreCount)] + [(cacheDataHit1[1]/CoreCount)] + [(cacheDataHit1[2]/CoreCount)] + [(cacheDataHit1[3]/CoreCount)] + [(cacheDataHit1[4]/CoreCount)] + [(cacheDataHit1[5]/CoreCount)] + [(cacheDataHit1[6]/CoreCount)] + [(cacheDataHit1[7]/CoreCount)] + [(cacheDataHit1[8]/CoreCount)] + [(cacheDataHit1[9]/CoreCount)]
-            Hit_line_ds.data = dataHit
 
             dataWB = dict()
             dataWB['x'] = WB_line_ds.data['x'] + [x_c] + [x_c+1] + [x_c+2] + [x_c+3] + [x_c+4] + [x_c+5] + [x_c+6] + [x_c+7] + [x_c+8] + [x_c+9]
             dataWB['y'] = WB_line_ds.data['y'] + [(cacheDataWB1[0]/CoreCount)] + [(cacheDataWB1[1]/CoreCount)] + [(cacheDataWB1[2]/CoreCount)] + [(cacheDataWB1[3]/CoreCount)] + [(cacheDataWB1[4]/CoreCount)] + [(cacheDataWB1[5]/CoreCount)] + [(cacheDataWB1[6]/CoreCount)] + [(cacheDataWB1[7]/CoreCount)] + [(cacheDataWB1[8]/CoreCount)] + [(cacheDataWB1[9]/CoreCount)]
+
+
+            x_c += 10
+
+            if(final_plot) and not (plot):
+                x_c = 1
+                dataBar['x'] = dataBar['x'][:-final_plot]
+                dataBar['top'] = dataBar['top'][:-final_plot]
+                dataMiss['x'] = dataMiss['x'][:-final_plot]
+                dataMiss['y'] = dataMiss['y'][:-final_plot]
+                dataHit['x'] = dataHit['x'][:-final_plot]
+                dataHit['y'] = dataHit['y'][:-final_plot]
+                dataWB['x'] = dataWB['x'][:-final_plot]
+                dataWB['y'] = dataWB['y'][:-final_plot]
+                final_plot = 0
+
+            else:
+                plot -= 1          
+
+            bar_ds.data = dataBar
+            Miss_line_ds.data = dataMiss
+            Hit_line_ds.data = dataHit
             WB_line_ds.data = dataWB
             select_ds.data = dataWB
 
-            x_c += 10
+        if(clear_column):
+            Miss_line_ds.data['x'] = []
+            Miss_line_ds.data['y'] = []
+            Hit_line_ds.data['x'] = []
+            Hit_line_ds.data['y'] = []  
+            WB_line_ds.data['x'] = []
+            WB_line_ds.data['y'] = []           
+            bar_ds.data['x'] = []
+            bar_ds.data['top'] = []
+            #select_ds.data['x'] = []
+            #select_ds.data['y'] = []
+            clear_column = 0
 
         if(finished) and (mainQueue.empty()):
             print(" RENDERING OTHER GRAPHS ")           
             execution_array = np.roll(execution_array,1)
-            execution_array[0] = maxRow + 1
+            execution_array[0] = maxRow
             usage_array = np.roll(usage_array, 1)
             usage_array[0] = round(total/execution_array[0], 3)
             newTable = {'Application' : table_ds.data['Application'],
@@ -574,11 +615,14 @@ def plotterUpdater():
                     'Average Utilisation' : usage_array}
             table_ds.data = newTable
 
+            print("REFRESHING")
             ####### REFRESHING
-            heatmap.renderers = []
-            liveLine.renderers = []
             empty = np.ndarray(ThreadCount, buffer=np.zeros(ThreadCount), dtype=np.uint16)
-            mainQueue.put(empty, False) ## Re-initialise so that it is not empty and plotting can take place
+            mainQueue.put(empty, False) ## Add three void data sets to space application runs
+            mainQueue.put(empty, False) 
+            mainQueue.put(empty, False) 
+
+
             range_tool = RangeTool(x_range = line.x_range)
             range_tool.overlay.fill_color = "navy"
             range_tool.overlay.fill_alpha = 0.2

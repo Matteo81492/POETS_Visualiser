@@ -26,7 +26,7 @@ def signal_handler(signal_in, frame):
 def main():
     current = 0  
     signal.signal(signal.SIGINT, signal_handler)
-    fName = './new_data/instrumentation_512x512.csv'
+    fName = './new_data/instrumentation.csv'
     ## Loading the entire document so that data can be sent without interruptions at fixed intervals
     try:
         file_obj = open(fName, "rb")
