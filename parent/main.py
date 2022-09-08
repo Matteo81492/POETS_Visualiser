@@ -6,7 +6,6 @@
 from multiprocessing import Queue
 import threading
 import sys
-import math
 import socket
 import time
 import signal
@@ -139,7 +138,7 @@ liveLine.x_range.follow_interval = 30
 liveLine.x_range.range_padding=0
 liveLine.xaxis.formatter = PrintfTickFormatter(format="%ds")
 liveLine.xaxis.ticker = SingleIntervalTicker(interval= 1)
-liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX/s")
+liveLine.yaxis.formatter = PrintfTickFormatter(format="%d TX")
 
 step = refresh_rate/1000 # Step for X axis
 zero_list = [0] * 4
