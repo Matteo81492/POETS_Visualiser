@@ -231,7 +231,7 @@ tdata = {'Application' : range(1,11),
 source = ColumnDataSource(data=tdata)
 columns = [
     TableColumn(field="Application", title="Application"),
-    TableColumn(field="Execution Time", title="Execetution Time (s)",
+    TableColumn(field="Execution Time", title="Execution Time (s)",
                 formatter=StringFormatter(text_align="center")),
     TableColumn(field="Average Utilisation", title="Average Utilisation (TX/s)",
                 formatter=NumberFormatter(text_align="right")),
@@ -298,7 +298,6 @@ def clicker_h(event):
         heatmap.tools[0].tooltips = [("box", "$index"),
                                     ("TX/s", "@intensity")]
 
-    mainQueue.put(empty)
 
 def clicker_l(event):
     global ContainerX, ContainerY, line_colours, gap2
